@@ -50,7 +50,7 @@ app.get('/install-agent.sh', (req, res) => {
   res.type('text/plain').sendFile(scriptPath)
 })
 app.get('/install-agent.tar.gz', (req, res) => {
-  const tarPath = '/install-agent.tar.gz'
+  const tarPath = path.resolve(__dirname, '../install-agent.tar.gz')
   if (!fs.existsSync(tarPath)) return res.status(404).type('text/plain').send('# Not found')
   res.type('application/gzip').sendFile(tarPath)
 })

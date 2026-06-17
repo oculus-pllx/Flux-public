@@ -39,6 +39,19 @@ APP="${ROOT}/opt/flux"
 mkdir -p "${APP}/backend" "${APP}/frontend/dist"
 cp -r "${REPO_ROOT}/backend/." "${APP}/backend/"
 cp -r "${REPO_ROOT}/frontend/dist/." "${APP}/frontend/dist/"
+cp "${REPO_ROOT}/install-agent.sh" "${APP}/install-agent.sh"
+
+echo "==> Bundling agent installer payload..."
+AGENT_BUILD="${TMP}/flux-agent"
+mkdir -p "${AGENT_BUILD}"
+cp -r "${REPO_ROOT}/flux-agent/." "${AGENT_BUILD}/"
+rm -rf "${AGENT_BUILD}/node_modules"
+cd "${AGENT_BUILD}"
+npm ci --omit=dev --silent
+tar czf "${APP}/install-agent.tar.gz" \
+  --exclude='./__tests__' \
+  --exclude='./windows' \
+  -C "${AGENT_BUILD}" .
 
 # Install production backend deps inside the package
 echo "==> Installing backend production dependencies..."
@@ -55,6 +68,7 @@ cp "${REPO_ROOT}/installer/linux/flux-update.sh"      "${APP}/bin/flux-update.sh
 cp "${REPO_ROOT}/installer/linux/flux-updater.service" "${ROOT}/lib/systemd/system/"
 cp "${REPO_ROOT}/installer/linux/flux-updater.path"    "${ROOT}/lib/systemd/system/"
 chmod 755 "${APP}/bin/flux-update.sh"
+chmod 755 "${APP}/install-agent.sh"
 chmod 644 "${ROOT}/lib/systemd/system/flux-updater.service" "${ROOT}/lib/systemd/system/flux-updater.path"
 
 # 4. Copy DEBIAN metadata to build dir and update version
