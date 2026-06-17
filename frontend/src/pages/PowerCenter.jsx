@@ -5,6 +5,7 @@ import { useAuth } from '../App'
 import SshInstallModal from '../components/SshInstallModal'
 import AddUpsWizard from '../components/AddUpsWizard'
 import UpsConfigModal from '../components/UpsConfigModal'
+import { sortByShutdownPriority } from '../utils/shutdownOrder'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,8 +76,6 @@ function timeAgo(dateStr) {
 
 // ── UPS Group Header ──────────────────────────────────────────────────────────
 
-const ROLE_SHUTDOWN_PRIORITY = { controlled: 0, 'pve-node': 1, pbs: 2, 'ups-host': 3 }
-
 function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, onEdit }) {
   const navigate = useNavigate()
   const [mutePhase,   setMutePhase]   = useState('idle')
@@ -117,9 +116,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, on
   async function applyTemplate() {
     if (!machines || machines.length === 0) return
     setTemplating(true)
-    const sorted = [...machines].sort((a, b) =>
-      (ROLE_SHUTDOWN_PRIORITY[a.role] ?? 0) - (ROLE_SHUTDOWN_PRIORITY[b.role] ?? 0)
-    )
+    const sorted = sortByShutdownPriority(machines)
     try {
       await Promise.all(sorted.map((m, i) =>
         axios.put(`/api/agents/${m.id}`, { shutdownOrder: i + 1, shutdownDelay: i * 30 }, { headers })
@@ -254,7 +251,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, on
             <button
               onClick={applyTemplate}
               disabled={templating}
-              title="Auto-assign shutdown order by role (controlled→pve-node→pbs→ups-host) with 30s intervals"
+              title="Auto-assign shutdown order by role (controlled -> pbs -> pve-node -> ups-host) with 30s intervals"
               style={{
                 background: 'rgba(255,255,255,0.05)', border: '1px solid var(--flux-border)',
                 color: templating ? '#475569' : 'var(--flux-muted)', fontSize: 11,
@@ -425,9 +422,27 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, on
 
 // ── Machine Row ───────────────────────────────────────────────────────────────
 
-function MachineRow({ machine }) {
+function MachineRow({ machine, canWrite = false, headers, onRefresh }) {
   const navigate = useNavigate()
+  const [editingOrder, setEditingOrder] = useState(false)
+  const [order, setOrder] = useState(String(machine.shutdownOrder || 0))
+  const [delay, setDelay] = useState(String(machine.shutdownDelay || 0))
+  const [savingOrder, setSavingOrder] = useState(false)
   const isSurge = machine.upsOutletBatteryBacked === false
+
+  async function saveOrder(e) {
+    e.stopPropagation()
+    setSavingOrder(true)
+    try {
+      await axios.put(`/api/agents/${machine.id}`, {
+        shutdownOrder: Number(order) || 0,
+        shutdownDelay: Number(delay) || 0,
+      }, { headers })
+      setEditingOrder(false)
+      onRefresh()
+    } catch {}
+    finally { setSavingOrder(false) }
+  }
 
   let outletBadge = null
   if (machine.upsOutletBatteryBacked === true) {
@@ -515,7 +530,30 @@ function MachineRow({ machine }) {
             · "{machine.upsOutlet}"
           </span>
         )}
-        {(machine.shutdownOrder || machine.shutdownDelay) ? (
+        {editingOrder ? (
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <input
+              value={order}
+              onChange={e => setOrder(e.target.value)}
+              type="number"
+              min={0}
+              title="Shutdown order"
+              style={{ width: 44, background: 'var(--flux-bg)', border: '1px solid var(--flux-border)', color: 'var(--flux-text)', borderRadius: 4, fontSize: 11, padding: '2px 4px', fontFamily: 'monospace' }}
+            />
+            <input
+              value={delay}
+              onChange={e => setDelay(e.target.value)}
+              type="number"
+              min={0}
+              title="Shutdown delay seconds"
+              style={{ width: 54, background: 'var(--flux-bg)', border: '1px solid var(--flux-border)', color: 'var(--flux-text)', borderRadius: 4, fontSize: 11, padding: '2px 4px', fontFamily: 'monospace' }}
+            />
+            <button onClick={saveOrder} disabled={savingOrder}
+              style={{ background: 'var(--flux-accent)', color: '#fff', border: 0, borderRadius: 4, fontSize: 10, padding: '3px 6px', cursor: savingOrder ? 'not-allowed' : 'pointer' }}>
+              {savingOrder ? '...' : 'Save'}
+            </button>
+          </div>
+        ) : (machine.shutdownOrder || machine.shutdownDelay) ? (
           <span style={{
             fontFamily: 'monospace', fontSize: 11, fontWeight: 600,
             color: '#38bdf8',
@@ -527,6 +565,13 @@ function MachineRow({ machine }) {
           </span>
         ) : (
           <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--flux-border)', minWidth: 28, textAlign: 'right' }}>—</span>
+        )}
+        {canWrite && !editingOrder && (
+          <button
+            onClick={e => { e.stopPropagation(); setOrder(String(machine.shutdownOrder || 0)); setDelay(String(machine.shutdownDelay || 0)); setEditingOrder(true) }}
+            style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)', borderRadius: 4, fontSize: 10, padding: '2px 6px', cursor: 'pointer' }}>
+            Order
+          </button>
         )}
         <span style={{
           fontFamily: 'monospace', fontSize: 11, fontWeight: 500,
@@ -907,7 +952,7 @@ export default function PowerCenter() {
                     No machines assigned to this UPS
                   </div>
                 ) : (
-                  machines.map(m => <MachineRow key={m.id} machine={m} />)
+                  machines.map(m => <MachineRow key={m.id} machine={m} canWrite={canWrite} headers={headers} onRefresh={load} />)
                 )}
               </div>
             </div>

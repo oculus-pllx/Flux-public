@@ -27,6 +27,7 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
   const [saveBusy,   setSaveBusy]   = useState(false)
   const [newDevice,  setNewDevice]  = useState(null)
   const [showSsh,    setShowSsh]    = useState(false)
+  const [agentCheck, setAgentCheck] = useState(null)
 
   const f = (key) => ({
     value: form[key],
@@ -123,6 +124,25 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
       setSaveErr(err.response?.data?.error || 'Failed to create device')
     } finally {
       setSaveBusy(false)
+    }
+  }
+
+  async function verifyInitialAgent(machineId) {
+    if (!machineId || !newDevice?.id) return
+    setAgentCheck({ state: 'checking', message: 'Checking UPS host assignment...' })
+    try {
+      const { data: machine } = await axios.get(`/api/agents/${machineId}`, { headers })
+      if (machine.upsGroupId !== newDevice.id) {
+        await axios.put(`/api/agents/${machineId}`, { upsGroupId: newDevice.id }, { headers })
+        setAgentCheck({ state: 'ok', message: 'UPS host agent was installed and attached to this UPS.' })
+      } else {
+        setAgentCheck({ state: 'ok', message: 'UPS host agent is attached to this UPS.' })
+      }
+    } catch (err) {
+      setAgentCheck({
+        state: 'error',
+        message: err.response?.data?.error || err.message || 'Could not verify UPS host assignment.',
+      })
     }
   }
 
@@ -317,28 +337,49 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
         )}
 
         {step === 2 && showSsh && (
-	          <SshInstallModal
-	            headers={headers}
-	            deviceId={newDevice?.id}
-	            upsGroupId={newDevice?.id}
-	            role="ups-host"
-	            nutConfig={discovered?.installed ? {
-	              managedByFlux: true,
-	              upsName: form.upsName || 'ups',
-	              driver: 'usbhid-ups',
-	              port: 'auto',
-	              desc: form.name || 'UPS',
-	              upsdPort: Number(form.port) || 3493,
-	              upsdUser: {
-	                name: form.nutUsername || 'fluxmon',
-	                password: form.nutPassword || 'fluxmon',
-	                upsmonPassword: form.nutPassword || 'fluxmon',
-	              },
-	            } : null}
-	            onSuccess={onSuccess}
-	            onClose={() => setShowSsh(false)}
-	            inline={true}
-	          />
+          <>
+            <SshInstallModal
+              headers={headers}
+              deviceId={newDevice?.id}
+              upsGroupId={newDevice?.id}
+              role="ups-host"
+              nutConfig={discovered?.installed ? {
+                managedByFlux: true,
+                upsName: form.upsName || 'ups',
+                driver: 'usbhid-ups',
+                port: 'auto',
+                desc: form.name || 'UPS',
+                upsdPort: Number(form.port) || 3493,
+                upsdUser: {
+                  name: form.nutUsername || 'fluxmon',
+                  password: form.nutPassword || 'fluxmon',
+                  upsmonPassword: form.nutPassword || 'fluxmon',
+                },
+              } : null}
+              onSuccess={verifyInitialAgent}
+              onClose={() => setShowSsh(false)}
+              inline={true}
+            />
+            {agentCheck && (
+              <div style={{
+                marginTop: 12,
+                border: `1px solid ${agentCheck.state === 'error' ? 'var(--flux-critical)' : agentCheck.state === 'ok' ? 'rgba(16,185,129,0.35)' : 'var(--flux-border)'}`,
+                color: agentCheck.state === 'error' ? 'var(--flux-critical)' : agentCheck.state === 'ok' ? 'var(--flux-healthy)' : 'var(--flux-muted)',
+                borderRadius: 8,
+                padding: 10,
+                fontSize: 12,
+                fontFamily: 'IBM Plex Mono, monospace',
+              }}>
+                {agentCheck.message}
+              </div>
+            )}
+            {agentCheck?.state === 'ok' && (
+              <button onClick={onSuccess}
+                style={{ width: '100%', marginTop: 10, background: 'var(--flux-accent)', color: '#fff', border: 0, borderRadius: 8, padding: 10, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                Finish
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

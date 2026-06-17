@@ -25,6 +25,24 @@ function fieldValue(device, key, fallback = '') {
   return device?.[key] ?? fallback
 }
 
+function TextInput({ label, value, onChange, type = 'text', required = false, placeholder }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        style={inputStyle}
+        onFocus={e => { e.currentTarget.style.borderColor = 'var(--flux-accent)' }}
+        onBlur={e => { e.currentTarget.style.borderColor = 'var(--flux-border)' }}
+      />
+    </div>
+  )
+}
+
 export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: fieldValue(device, 'name'),
@@ -130,22 +148,6 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
     }
   }
 
-  const Input = ({ label, value, onChange, type = 'text', required = false, placeholder }) => (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        required={required}
-        placeholder={placeholder}
-        style={inputStyle}
-        onFocus={e => { e.currentTarget.style.borderColor = 'var(--flux-accent)' }}
-        onBlur={e => { e.currentTarget.style.borderColor = 'var(--flux-border)' }}
-      />
-    </div>
-  )
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.68)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'var(--flux-panel)', border: '1px solid var(--flux-border)', borderRadius: 10, width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 20 }}>
@@ -156,17 +158,17 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
 
         <form onSubmit={save} style={{ display: 'grid', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
-            <Input label="Display Name" value={form.name} onChange={updateForm('name')} required />
-            <Input label="UPS Name in NUT" value={form.upsName} onChange={updateForm('upsName')} required />
+            <TextInput label="Display Name" value={form.name} onChange={updateForm('name')} required />
+            <TextInput label="UPS Name in NUT" value={form.upsName} onChange={updateForm('upsName')} required />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .6fr .6fr', gap: 12 }}>
-            <Input label="NUT Host" value={form.host} onChange={updateForm('host')} required />
-            <Input label="NUT Port" type="number" value={form.port} onChange={updateForm('port')} required />
-            <Input label="Poll Interval" type="number" value={form.pollInterval} onChange={updateForm('pollInterval')} required />
+            <TextInput label="NUT Host" value={form.host} onChange={updateForm('host')} required />
+            <TextInput label="NUT Port" type="number" value={form.port} onChange={updateForm('port')} required />
+            <TextInput label="Poll Interval" type="number" value={form.pollInterval} onChange={updateForm('pollInterval')} required />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Input label="NUT Username" value={form.nutUsername} onChange={updateForm('nutUsername')} placeholder="fluxmon" />
-            <Input label="NUT Password" type="password" value={form.nutPassword} onChange={updateForm('nutPassword')} placeholder={device?.hasNutCredentials ? 'leave blank to keep saved password' : ''} />
+            <TextInput label="NUT Username" value={form.nutUsername} onChange={updateForm('nutUsername')} placeholder="fluxmon" />
+            <TextInput label="NUT Password" type="password" value={form.nutPassword} onChange={updateForm('nutPassword')} placeholder={device?.hasNutCredentials ? 'leave blank to keep saved password' : ''} />
           </div>
           <label style={{ color: 'var(--flux-muted)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={form.active} onChange={updateForm('active')} />
@@ -191,9 +193,9 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
           <h3 style={{ color: 'var(--flux-text)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Configure NUT via SSH</h3>
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .6fr .8fr', gap: 12 }}>
-              <Input label="SSH Host" value={ssh.host} onChange={updateSsh('host')} />
-              <Input label="SSH Port" type="number" value={ssh.sshPort} onChange={updateSsh('sshPort')} />
-              <Input label="SSH User" value={ssh.sshUser} onChange={updateSsh('sshUser')} />
+              <TextInput label="SSH Host" value={ssh.host} onChange={updateSsh('host')} />
+              <TextInput label="SSH Port" type="number" value={ssh.sshPort} onChange={updateSsh('sshPort')} />
+              <TextInput label="SSH User" value={ssh.sshUser} onChange={updateSsh('sshUser')} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '.7fr 1fr 1fr', gap: 12 }}>
               <div>
@@ -204,11 +206,11 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
                 </select>
               </div>
               {ssh.sshAuthType === 'password' ? (
-                <Input label="SSH Password" type="password" value={ssh.sshPassword} onChange={updateSsh('sshPassword')} />
+                <TextInput label="SSH Password" type="password" value={ssh.sshPassword} onChange={updateSsh('sshPassword')} />
               ) : (
-                <Input label="Key File Path" value={ssh.sshKeyPath} onChange={updateSsh('sshKeyPath')} placeholder="/root/.ssh/id_rsa" />
+                <TextInput label="Key File Path" value={ssh.sshKeyPath} onChange={updateSsh('sshKeyPath')} placeholder="/root/.ssh/id_rsa" />
               )}
-              <Input label="NUT Control User" value={ssh.nutUsername} onChange={updateSsh('nutUsername')} />
+              <TextInput label="NUT Control User" value={ssh.nutUsername} onChange={updateSsh('nutUsername')} />
             </div>
             {ssh.sshAuthType === 'key' && (
               <div>
@@ -223,7 +225,7 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
                 )}
               </div>
             )}
-            <Input label="New NUT Password" type="password" value={ssh.nutPassword} onChange={updateSsh('nutPassword')} placeholder="leave blank to generate" />
+            <TextInput label="New NUT Password" type="password" value={ssh.nutPassword} onChange={updateSsh('nutPassword')} placeholder="leave blank to generate" />
             {repairMsg && <p style={{ color: 'var(--flux-healthy)', fontSize: 12, margin: 0 }}>{repairMsg}</p>}
             <div>
               <button type="button" onClick={repair} disabled={busy || repairBusy || !ssh.host}
