@@ -127,8 +127,8 @@ systemctl enable "${SERVICE_NAME}"
 info "Enrolling with Flux server..."
 "${NODE_BIN}" "${AGENT_DIR}/agent.js" || true
 
-# Start service
-systemctl start "${SERVICE_NAME}"
+# Restart service so re-installs pick up rewritten config and agent bundle
+systemctl restart "${SERVICE_NAME}"
 sleep 2
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
   info "flux-agent is running. Machine will appear in Flux dashboard momentarily."
