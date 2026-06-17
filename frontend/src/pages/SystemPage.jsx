@@ -110,7 +110,7 @@ function ServerUpdateCard({ headers }) {
           style={{ background: 'var(--flux-bg)', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}>
           One-click update is not available for this install.<br />
           Docker: run <span style={{ color: 'var(--flux-text)' }}>git pull && docker compose up -d --build</span> in the Flux directory.<br />
-          Systemd: re-run install.sh once to enable the updater.
+          Systemd: run <span style={{ color: 'var(--flux-text)' }}>{status.manualCommand || 'install.sh'}</span> once to enable the updater.
         </div>
       )}
 

@@ -3,9 +3,17 @@ const path = require('path')
 const http = require('http')
 const { getLatestRelease, compareVersions } = require('./githubService')
 
-const GITHUB_REPO     = 'oculus-pllx/Flux-public'
 const CURRENT_VERSION = require('../package.json').version
 const CACHE_TTL_MS    = 10 * 60 * 1000
+
+function githubRepo() {
+  return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-public'
+}
+
+function manualCommand(repo = githubRepo()) {
+  const branch = process.env.FLUX_GITHUB_BRANCH || 'main'
+  return `tmp=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/${repo}/${branch}/install.sh -o "$tmp" && printf '\\n' | sudo bash "$tmp"; rm -f "$tmp"`
+}
 
 function dir()         { return process.env.FLUX_UPDATE_DIR || '/var/lib/flux' }
 function triggerFile() { return path.join(dir(), 'update-requested') }
@@ -34,7 +42,7 @@ async function getStatus() {
     release = releaseCache.release
   } else {
     try {
-      release = await getLatestRelease(GITHUB_REPO)
+      release = await getLatestRelease(githubRepo())
       releaseCache = { at: Date.now(), release }
     } catch (e) { error = e.message }
   }
@@ -45,6 +53,8 @@ async function getStatus() {
     publishedAt:     release ? release.publishedAt : null,
     notes:           release ? release.notes : '',
     mode,
+    repo:            githubRepo(),
+    manualCommand:   manualCommand(),
     ...(error ? { error } : {}),
   }
 }
@@ -90,7 +100,7 @@ async function applyUpdate() {
   const err = new Error(
     'One-click update is not available for this install. ' +
     'Docker: run `git pull && docker compose up -d --build` in the Flux directory. ' +
-    'Systemd: re-run install.sh once to enable the updater.'
+    `Systemd: run \`${manualCommand()}\` once to enable the updater.`
   )
   err.status = 400
   throw err

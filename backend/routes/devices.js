@@ -150,6 +150,49 @@ router.post('/install-nut', requireRole('admin', 'operator'), async (req, res, n
   } catch (err) { next(err) }
 })
 
+router.post('/:id/configure-nut', requireRole('admin', 'operator'), async (req, res, next) => {
+  try {
+    const device = await Device.findByPk(req.params.id)
+    if (!device) return res.status(404).json({ error: 'Not found' })
+
+    const machine = sshMachineFromBody(req.body)
+    const sshService = require('../services/sshService')
+    const nutUsername = req.body.nutUsername || device.nutUsername || 'fluxmon'
+    const nutPassword = req.body.nutPassword || crypto.randomBytes(16).toString('hex')
+    assertNutToken(nutUsername, 'NUT username')
+    assertNutSecret(nutPassword, 'NUT password')
+
+    await sshService.installNutServer(machine, { nutUsername, nutPassword })
+    const discovered = await discoverNut(machine)
+    const upsName = discovered.upsNames.includes(device.upsName)
+      ? device.upsName
+      : (discovered.upsNames[0] || device.upsName)
+    const update = {
+      host: discovered.nutHost,
+      port: discovered.nutPort,
+      upsName,
+      nutUsername,
+      nutPassword,
+    }
+
+    try {
+      const nutService = require('../services/nutService')
+      update.lastStatus = await nutService.pollDevice(
+        update.host,
+        update.port,
+        update.upsName,
+        update.nutUsername,
+        update.nutPassword
+      )
+      update.lastSeen = new Date()
+    } catch {}
+
+    await device.update(update)
+    pollingService.scheduleDevice(device)
+    res.json({ device: sanitizeDevice(device), discovered, nutUsername, configured: true })
+  } catch (err) { next(err) }
+})
+
 router.post('/', requireRole('admin', 'operator'), async (req, res, next) => {
   try {
     const device = await Device.create(devicePayload(req.body))

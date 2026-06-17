@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useAuth } from '../App'
 import SshInstallModal from '../components/SshInstallModal'
 import AddUpsWizard from '../components/AddUpsWizard'
+import UpsConfigModal from '../components/UpsConfigModal'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ function timeAgo(dateStr) {
 
 const ROLE_SHUTDOWN_PRIORITY = { controlled: 0, 'pve-node': 1, pbs: 2, 'ups-host': 3 }
 
-function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh }) {
+function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, onEdit }) {
   const navigate = useNavigate()
   const [mutePhase,   setMutePhase]   = useState('idle')
   const [muteMsg,     setMuteMsg]     = useState('')
@@ -213,6 +214,22 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh }) 
           )}
           {canWrite && (
             <button
+              onClick={onEdit}
+              title="Edit UPS configuration and NUT credentials"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--flux-border)',
+                color: 'var(--flux-muted)',
+                fontSize: 11,
+                padding: '3px 10px',
+                borderRadius: 5,
+                cursor: 'pointer',
+              }}>
+              Edit
+            </button>
+          )}
+          {canWrite && (
+            <button
               onClick={muteBeeper}
               disabled={mutePhase === 'busy' || mutePhase === 'ok' || !device.hasNutCredentials}
               title={
@@ -247,6 +264,19 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh }) 
               {templating ? 'Applying…' : '⚡ Auto-order'}
             </button>
           )}
+          <button
+            onClick={() => navigate(`/devices/${device.id}?tab=control`)}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--flux-border)',
+              color: 'var(--flux-muted)',
+              fontSize: 11,
+              padding: '3px 10px',
+              borderRadius: 5,
+              cursor: 'pointer',
+            }}>
+            Manage
+          </button>
           <button
             onClick={() => navigate(`/devices/${device.id}`)}
             style={{
@@ -760,6 +790,7 @@ export default function PowerCenter() {
   const [error,        setError]        = useState(null)
   const [enrollModal,  setEnrollModal]  = useState(false)
   const [showAddUps,   setShowAddUps]   = useState(false)
+  const [editUps,      setEditUps]      = useState(null)
   const headers   = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
   const canWrite  = user?.role === 'admin' || user?.role === 'operator'
   const isAdmin   = user?.role === 'admin'
@@ -863,7 +894,7 @@ export default function PowerCenter() {
               borderRadius: 12,
               overflow: 'hidden',
             }}>
-              <UpsHeader device={device} canWrite={canWrite} isAdmin={isAdmin} headers={headers} machines={machines} onRefresh={load} />
+              <UpsHeader device={device} canWrite={canWrite} isAdmin={isAdmin} headers={headers} machines={machines} onRefresh={load} onEdit={() => setEditUps(device)} />
 
               <div style={{ background: 'var(--flux-panel)' }}>
                 {machines.length === 0 ? (
@@ -944,6 +975,14 @@ export default function PowerCenter() {
           headers={headers}
           onSuccess={() => { setShowAddUps(false); load() }}
           onClose={() => setShowAddUps(false)}
+        />
+      )}
+      {editUps && (
+        <UpsConfigModal
+          device={editUps}
+          headers={headers}
+          onClose={() => setEditUps(null)}
+          onSaved={() => load()}
         />
       )}
     </div>

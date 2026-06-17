@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../App'
 import SshInstallModal from '../components/SshInstallModal'
+import UpsConfigModal from '../components/UpsConfigModal'
 
 const PRIORITY = [
   { key: 'ups.status',             label: 'Status' },
@@ -44,12 +45,14 @@ const BLANK_MACHINE = { name: '', host: '', sshPort: 22, sshUser: 'root', sshAut
 
 export default function DeviceDetail() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const { token, user } = useAuth()
   const navigate = useNavigate()
   const [device, setDevice]   = useState(null)
   const [metrics, setMetrics] = useState([])
   const [polling, setPolling] = useState(false)
-  const [tab, setTab]         = useState('overview')
+  const [tab, setTab]         = useState(searchParams.get('tab') === 'control' ? 'control' : 'overview')
+  const [editUps, setEditUps] = useState(false)
 
   // Control tab state
   const [commands, setCommands]   = useState(null)
@@ -270,13 +273,22 @@ export default function DeviceDetail() {
           </p>
         </div>
         {canWrite && (
-          <button onClick={pollNow} disabled={polling}
-            className="font-display font-semibold text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-50"
-            style={{ border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--flux-accent)'; e.currentTarget.style.color = 'var(--flux-accent)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--flux-border)'; e.currentTarget.style.color = 'var(--flux-muted)' }}>
-            {polling ? 'Polling…' : '↻ Poll Now'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setEditUps(true)}
+              className="font-display font-semibold text-sm px-4 py-2 rounded-lg transition-all"
+              style={{ border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--flux-accent)'; e.currentTarget.style.color = 'var(--flux-accent)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--flux-border)'; e.currentTarget.style.color = 'var(--flux-muted)' }}>
+              Edit UPS
+            </button>
+            <button onClick={pollNow} disabled={polling}
+              className="font-display font-semibold text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+              style={{ border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--flux-accent)'; e.currentTarget.style.color = 'var(--flux-accent)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--flux-border)'; e.currentTarget.style.color = 'var(--flux-muted)' }}>
+              {polling ? 'Polling…' : '↻ Poll Now'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -927,6 +939,14 @@ export default function DeviceDetail() {
             </button>
           </div>
         </Modal>
+      )}
+      {editUps && (
+        <UpsConfigModal
+          device={device}
+          headers={headers}
+          onClose={() => setEditUps(false)}
+          onSaved={updated => setDevice(updated)}
+        />
       )}
     </div>
   )

@@ -15,12 +15,14 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flux-upd-'))
   process.env.FLUX_UPDATE_DIR = tmpDir
   delete process.env.FLUX_UPDATE_MODE
+  delete process.env.FLUX_GITHUB_REPO
   delete process.env.UPDATER_TOKEN
 })
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true })
   delete process.env.FLUX_UPDATE_DIR
+  delete process.env.FLUX_GITHUB_REPO
 })
 
 function svc() { return require('../services/serverUpdateService') }
@@ -70,6 +72,15 @@ describe('getStatus', () => {
     const s = await svc().getStatus()
     expect(s.updateAvailable).toBe(false)
     expect(s.error).toBe('boom')
+  })
+
+  it('uses FLUX_GITHUB_REPO for public repo update checks and manual command hints', async () => {
+    process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-public'
+    gh().getLatestRelease.mockResolvedValue({ tag: 'v99.0.0', version: '99.0.0', publishedAt: null, notes: '', assets: [] })
+    const s = await svc().getStatus()
+    expect(gh().getLatestRelease).toHaveBeenCalledWith('oculus-pllx/Flux-public')
+    expect(s.repo).toBe('oculus-pllx/Flux-public')
+    expect(s.manualCommand).toContain('Flux-public')
   })
 })
 

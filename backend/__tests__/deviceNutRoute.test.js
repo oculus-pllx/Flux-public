@@ -9,12 +9,17 @@ jest.mock('../services/pollingService', () => ({
   scheduleDevice: jest.fn(),
   stopDevice: jest.fn(),
 }))
+jest.mock('../services/nutService', () => ({
+  pollDevice: jest.fn(),
+}))
 
 const request = require('supertest')
 const express = require('express')
 const jwt     = require('jsonwebtoken')
 const { sequelize } = require('../config/database')
 const sshService = require('../services/sshService')
+const nutService = require('../services/nutService')
+const Device = require('../models/Device')
 
 const app = express()
 app.use(express.json())
@@ -110,5 +115,46 @@ describe('POST /api/devices/install-nut', () => {
     sshService.installNutServer.mockRejectedValue(new Error('apt failed'))
     const res = await request(app).post('/api/devices/install-nut').set(auth).send(sshBody)
     expect(res.status).toBe(500)
+  })
+})
+
+describe('POST /api/devices/:id/configure-nut', () => {
+  it('repairs NUT over SSH and saves full-control credentials on an existing device', async () => {
+    const device = await Device.create({
+      name: 'APC 2200',
+      host: '10.11.200.23',
+      port: 3493,
+      upsName: 'apc2200',
+      pollInterval: 30,
+    })
+    sshService.installNutServer.mockResolvedValue('FLUX_NUT_SERVER_OK')
+    nutService.pollDevice.mockResolvedValue({ 'ups.status': 'OL', 'ups.beeper.status': 'disabled' })
+    mockSsh({
+      upsNames: 'apc2200\n',
+      upsdConf: 'LISTEN 0.0.0.0 3493\n',
+      upsdUsers: '[fluxctl]\n  password = secret123\n  upsmon primary\n  actions = SET\n  instcmds = ALL\n',
+    })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/configure-nut`)
+      .set(auth)
+      .send({ ...sshBody, nutUsername: 'fluxctl', nutPassword: 'secret123' })
+
+    expect(res.status).toBe(200)
+    expect(sshService.installNutServer).toHaveBeenCalledWith(
+      expect.objectContaining({ host: sshBody.host }),
+      { nutUsername: 'fluxctl', nutPassword: 'secret123' }
+    )
+    expect(nutService.pollDevice).toHaveBeenCalledWith('192.168.0.100', 3493, 'apc2200', 'fluxctl', 'secret123')
+    expect(res.body.device.host).toBe('192.168.0.100')
+    expect(res.body.device.upsName).toBe('apc2200')
+    expect(res.body.device.nutUsername).toBe('fluxctl')
+    expect(res.body.device.hasNutCredentials).toBe(true)
+    expect(res.body.device.nutPassword).toBeUndefined()
+
+    await device.reload()
+    expect(device.nutUsername).toBe('fluxctl')
+    expect(device.nutPassword).toBe('secret123')
+    expect(device.lastStatus).toEqual({ 'ups.status': 'OL', 'ups.beeper.status': 'disabled' })
   })
 })

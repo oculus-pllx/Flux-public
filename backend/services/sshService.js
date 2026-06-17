@@ -231,7 +231,7 @@ if grep -qF "[$FLUX_NUT_USER]" "$CONF_DIR/upsd.users"; then
   awk -v u="[$FLUX_NUT_USER]" 'index($0, u) == 1 { skip = 1; next } /^\\[/ { skip = 0 } !skip' \\
     "$CONF_DIR/upsd.users" > "$CONF_DIR/upsd.users.flux" && mv "$CONF_DIR/upsd.users.flux" "$CONF_DIR/upsd.users"
 fi
-printf '\\n[%s]\\n  password = %s\\n  upsmon master\\n' "$FLUX_NUT_USER" ${pass} >> "$CONF_DIR/upsd.users"
+printf '\\n[%s]\\n  password = %s\\n  upsmon primary\\n  actions = SET\\n  instcmds = ALL\\n' "$FLUX_NUT_USER" ${pass} >> "$CONF_DIR/upsd.users"
 chmod 640 "$CONF_DIR/upsd.users" 2>/dev/null || true
 udevadm trigger 2>/dev/null || true
 upsdrvctl start >/dev/null 2>&1 || true
