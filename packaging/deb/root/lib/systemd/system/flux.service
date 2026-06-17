@@ -1,0 +1,19 @@
+[Unit]
+Description=Flux UPS Monitor
+Documentation=https://github.com/oculus-pllx/FLux
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/flux
+ExecStart=/opt/flux/node/bin/node backend/server.js
+EnvironmentFile=/etc/flux/.env
+Restart=always
+RestartSec=5
+User=flux
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=flux
+
+[Install]
+WantedBy=multi-user.target

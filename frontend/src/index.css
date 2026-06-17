@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --flux-bg:       #0b0f14;
+  --flux-panel:    #131920;
+  --flux-panel2:   #1a2332;
+  --flux-border:   rgba(255, 255, 255, 0.08);
+  --flux-text:     #e2e8f0;
+  --flux-muted:    #64748b;
+  --flux-dim:      #3d4f63;
+  --flux-accent:   #f97316;
+  --flux-glow:     rgba(249, 115, 22, 0.15);
+  --flux-healthy:  #10b981;
+  --flux-warning:  #f59e0b;
+  --flux-critical: #ef4444;
+}
+
+body {
+  background-color: var(--flux-bg);
+  color: var(--flux-text);
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+* {
+  border-color: var(--flux-border);
+}

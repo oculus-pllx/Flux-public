@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+if [ -d /run/systemd/system ]; then
+    systemctl stop flux || true
+    systemctl disable flux || true
+    systemctl daemon-reload
+fi

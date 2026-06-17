@@ -1,0 +1,78 @@
+{
+  "name": "@pllx/flux",
+  "version": "2.0.0",
+  "description": "Flux UPS Monitoring Dashboard by Parallax Group",
+  "main": "electron/main.js",
+  "author": "Parallax Group",
+  "license": "MIT",
+  "scripts": {
+    "electron:dev": "electron .",
+    "electron:build": "npm run build:frontend && electron-builder",
+    "electron:build:win": "npm run build:frontend && electron-builder --win",
+    "electron:build:linux": "npm run build:frontend && electron-builder --linux",
+    "build:frontend": "cd frontend && npm run build",
+    "build:service:win": "pkg backend/server.js --target node18-win-x64 --output dist-service/flux-service.exe",
+    "build:service:linux": "pkg backend/server.js --target node18-linux-x64 --output dist-service/flux-service",
+    "build:tray:win": "npm run build:frontend && electron-builder --win portable",
+    "build:installer:win": "makensis installer/windows/flux.nsi",
+    "build:installer:linux": "bash installer/linux/build-deb.sh"
+  },
+  "pkg": {
+    "assets": [
+      "frontend/dist/**",
+      "backend/node_modules/sqlite3/build/Release/*.node",
+      "backend/node_modules/cpu-features/build/Release/*.node",
+      "backend/node_modules/sshcrypto/build/Release/*.node"
+    ],
+    "targets": ["node18-win-x64", "node18-linux-x64"],
+    "outputPath": "dist-service"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.11.5",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.parallaxgroup.flux",
+    "productName": "Flux",
+    "copyright": "Copyright © 2026 Parallax Group",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "backend/**/*",
+      "frontend/dist/**/*",
+      "!backend/data/**/*",
+      "!**/node_modules/.cache/**/*"
+    ],
+    "asarUnpack": [
+      "backend/node_modules/sqlite3/**/*",
+      "backend/node_modules/bcryptjs/**/*",
+      "backend/node_modules/ssh2/**/*",
+      "backend/node_modules/cpu-features/**/*",
+      "backend/node_modules/sshcrypto/**/*"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.png",
+      "category": "Network"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

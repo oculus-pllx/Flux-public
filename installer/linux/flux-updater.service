@@ -1,0 +1,6 @@
+[Unit]
+Description=Flux self-update (oneshot, triggered by flux-updater.path)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/flux/bin/flux-update.sh

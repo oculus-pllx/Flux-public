@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+frontend/dist/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Docker volumes
+volumes/
+
+# Local assistant project memory
+CLAUDE.md
+
+# Electron build output
+dist-electron/
+build/
+
+# Service and installer build output
+dist-service/
+dist-installer/
+
+# NSSM binary (download manually — see installer/windows/flux.nsi header)
+installer/windows/nssm.exe
+.superpowers/
+
+# Local assistant session files — may contain credentials, must never be committed
+.claude/HANDOFF.md
+.claude/settings.local.json

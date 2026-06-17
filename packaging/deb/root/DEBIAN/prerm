@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+if systemctl is-active --quiet flux.service 2>/dev/null; then
+  systemctl stop flux.service
+fi
+systemctl disable flux.service 2>/dev/null || true

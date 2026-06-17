@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — MachinesPage Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --flux-bg:       #08090b;
+    --flux-panel:    #101216;
+    --flux-panel2:   #14171d;
+    --flux-border:   rgba(255,255,255,0.06);
+    --flux-text:     #e2e8f0;
+    --flux-muted:    #64748b;
+    --flux-dim:      #3e4555;
+    --flux-accent:   #f97316;
+    --flux-glow:     rgba(249,115,22,0.18);
+    --flux-healthy:  #10b981;
+    --flux-warning:  #f59e0b;
+    --flux-critical: #f43f5e;
+    --flux-info:     #38bdf8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; border-color: var(--flux-border); }
+  body { background: var(--flux-bg); color: var(--flux-text); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+  code, .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* NAV */
+  nav { background: var(--flux-panel); border-bottom: 1px solid var(--flux-border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo { display: flex; align-items: center; gap: 10px; }
+  .nav-logo .mark { width: 28px; height: 28px; background: var(--flux-accent); border-radius: 50%; opacity: 0.9; box-shadow: 0 0 12px var(--flux-glow); }
+  .nav-logo span { font-weight: 700; font-size: 20px; letter-spacing: 0.04em; color: var(--flux-text); text-shadow: 0 0 12px rgba(249,115,22,0.5); }
+  .nav-links { display: flex; gap: 24px; margin-left: 32px; }
+  .nav-link { font-weight: 600; font-size: 14px; letter-spacing: 0.04em; color: var(--flux-muted); text-decoration: none; cursor: pointer; transition: color 0.15s; }
+  .nav-link:hover { color: var(--flux-text); }
+  .nav-link.active { color: var(--flux-accent); }
+  .nav-user { color: var(--flux-muted); font-size: 13px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* VIEWS */
+  .view { display: none; padding: 24px; }
+  .view.active { display: block; }
+
+  /* PAGE HEADER */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-title { font-weight: 700; font-size: 20px; color: var(--flux-text); }
+
+  /* BUTTONS */
+  .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: 'IBM Plex Sans', sans-serif; }
+  .btn-primary { background: var(--flux-accent); color: #fff; }
+  .btn-primary:hover { box-shadow: 0 0 18px var(--flux-glow); }
+  .btn-ghost { background: transparent; border: 1px solid var(--flux-border); color: var(--flux-muted); }
+  .btn-ghost:hover { color: var(--flux-text); border-color: rgba(255,255,255,0.15); }
+  .btn-danger { background: transparent; border: 1px solid rgba(244,63,94,0.3); color: var(--flux-critical); }
+  .btn-danger:hover { background: rgba(244,63,94,0.1); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  /* CLUSTER BANNER */
+  .cluster-banner { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .cluster-chip { background: var(--flux-panel); border: 1px solid var(--flux-border); border-radius: 10px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  .cluster-chip .cluster-name { font-weight: 600; font-size: 13px; color: var(--flux-text); }
+  .cluster-chip .cluster-votes { font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: var(--flux-muted); }
+  .cluster-chip .cluster-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+  .cluster-status.safe { background: rgba(16,185,129,0.12); color: var(--flux-healthy); }
+  .cluster-status.risk { background: rgba(245,158,11,0.12); color: var(--flux-warning); }
+  .divider-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--flux-dim); margin-bottom: 12px; }
+
+  /* AGENT CARDS GRID */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .agent-card { background: var(--flux-panel); border: 1px solid var(--flux-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+  .agent-card:hover { border-color: rgba(249,115,22,0.35); box-shadow: 0 0 16px rgba(249,115,22,0.06); }
+  .agent-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .agent-hostname { font-weight: 600; font-size: 14px; color: var(--flux-text); font-family: 'IBM Plex Mono', monospace; }
+  .agent-os { font-size: 11px; color: var(--flux-dim); margin-top: 2px; }
+  .agent-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; }
+  .badge::before { content: '●'; font-size: 8px; }
+  .badge-online { background: rgba(16,185,129,0.12); color: var(--flux-healthy); }
+  .badge-offline { background: rgba(100,116,139,0.12); color: var(--flux-muted); }
+  .badge-shutting { background: rgba(245,158,11,0.12); color: var(--flux-warning); }
+  .badge-error { background: rgba(244,63,94,0.12); color: var(--flux-critical); }
+  .badge-pending { background: rgba(56,189,248,0.12); color: var(--flux-info); }
+  .badge-update { background: rgba(249,115,22,0.12); color: var(--flux-accent); }
+  .role-badge { background: rgba(255,255,255,0.05); color: var(--flux-muted); font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; }
+  .role-badge::before { display: none; }
+  .last-seen { font-size: 11px; color: var(--flux-dim); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* UPDATE BANNER */
+  .update-banner { background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.2); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .update-banner-text { font-size: 13px; color: var(--flux-accent); font-weight: 500; }
+  .update-banner-version { font-size: 12px; color: var(--flux-muted); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
+
+  /* DETAIL HEADER */
+  .detail-header { margin-bottom: 20px; }
+  .detail-back { font-size: 13px; color: var(--flux-muted); cursor: pointer; margin-bottom: 12px; display: inline-flex; align-items: center; gap: 4px; }
+  .detail-back:hover { color: var(--flux-text); }
+  .detail-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .detail-hostname { font-weight: 700; font-size: 22px; color: var(--flux-text); font-family: 'IBM Plex Mono', monospace; }
+  .detail-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  .detail-meta-item { font-size: 12px; color: var(--flux-dim); font-family: 'IBM Plex Mono', monospace; }
+  .detail-meta-sep { color: var(--flux-dim); }
+
+  /* TABS */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--flux-border); margin-bottom: 20px; }
+  .tab { padding: 10px 18px; font-size: 13px; font-weight: 600; color: var(--flux-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .tab:hover { color: var(--flux-text); }
+  .tab.active { color: var(--flux-accent); border-bottom-color: var(--flux-accent); }
+
+  /* TAB CONTENT */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* CARDS */
+  .card { background: var(--flux-panel); border: 1px solid var(--flux-border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--flux-dim); margin-bottom: 14px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .info-item label { font-size: 11px; color: var(--flux-dim); display: block; margin-bottom: 3px; }
+  .info-item value { font-size: 13px; color: var(--flux-text); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ACTIONS */
+  .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+  /* FORM */
+  .form-section { margin-bottom: 20px; }
+  .form-section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--flux-dim); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--flux-border); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: var(--flux-muted); }
+  .form-group input, .form-group select { background: var(--flux-bg); border: 1px solid var(--flux-border); color: var(--flux-text); border-radius: 8px; padding: 8px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--flux-accent); }
+  .form-group select option { background: var(--flux-panel); }
+  .collapsible-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--flux-border); border-radius: 8px; margin-bottom: 8px; }
+  .collapsible-header span { font-size: 13px; font-weight: 500; color: var(--flux-muted); font-family: 'IBM Plex Mono', monospace; }
+  .collapsible-header .arrow { color: var(--flux-dim); transition: transform 0.2s; font-size: 11px; }
+  .collapsible-body { display: none; background: rgba(255,255,255,0.01); border: 1px solid var(--flux-border); border-top: none; border-radius: 0 0 8px 8px; padding: 14px; margin-bottom: 8px; }
+  .collapsible-body.open { display: block; }
+  .collapsible-header.open .arrow { transform: rotate(90deg); }
+
+  /* EVENTS TABLE */
+  .events-table { width: 100%; border-collapse: collapse; }
+  .events-table th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--flux-dim); padding: 0 12px 10px; }
+  .events-table td { padding: 10px 12px; font-size: 13px; border-top: 1px solid var(--flux-border); }
+  .events-table tr:hover td { background: rgba(255,255,255,0.01); }
+  .state-arrow { color: var(--flux-dim); margin: 0 6px; }
+
+  /* ENROLLMENT MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--flux-panel); border: 1px solid var(--flux-border); border-radius: 14px; padding: 24px; width: 100%; max-width: 420px; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .modal-title { font-weight: 700; font-size: 15px; color: var(--flux-text); }
+  .modal-close { color: var(--flux-muted); font-size: 20px; cursor: pointer; background: none; border: none; line-height: 1; }
+  .token-box { background: var(--flux-bg); border: 1px solid var(--flux-border); border-radius: 8px; padding: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--flux-accent); word-break: break-all; margin-bottom: 12px; position: relative; }
+  .token-label { font-size: 11px; color: var(--flux-dim); margin-bottom: 4px; }
+  .copy-hint { font-size: 11px; color: var(--flux-dim); margin-top: 4px; }
+  .countdown { font-size: 12px; color: var(--flux-warning); font-family: 'IBM Plex Mono', monospace; text-align: center; margin-top: 8px; }
+  .install-cmd { background: var(--flux-bg); border: 1px solid var(--flux-border); border-radius: 8px; padding: 10px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--flux-muted); margin-top: 8px; }
+  .install-cmd .cmd-label { font-size: 10px; color: var(--flux-dim); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="nav-logo">
+      <div class="mark"></div>
+      <span>Flux</span>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" onclick="showView('dashboard')">Dashboard</a>
+      <a class="nav-link" onclick="showView('alerts')">Alerts</a>
+      <a class="nav-link active" id="nav-machines" onclick="showView('machines')">Machines</a>
+      <a class="nav-link" onclick="showView('users')">Users</a>
+      <a class="nav-link" onclick="showView('settings')">Settings</a>
+    </div>
+  </div>
+  <span class="nav-user">admin</span>
+</nav>
+
+<!-- ═══════════════════ MACHINES LIST VIEW ═══════════════════ -->
+<div class="view active" id="view-machines">
+  <div style="max-width:1100px">
+
+    <div class="page-header">
+      <h1 class="page-title">Machines</h1>
+      <button class="btn btn-primary" onclick="document.getElementById('enroll-modal').classList.add('open')">+ Enroll New Machine</button>
+    </div>
+
+    <!-- Cluster health banner -->
+    <div class="cluster-banner">
+      <div class="cluster-chip">
+        <div>
+          <div class="cluster-name">Cluster A</div>
+          <div class="cluster-votes mono">3 / 3 votes</div>
+        </div>
+        <span class="cluster-status safe">✓ Quorum safe</span>
+      </div>
+      <div class="cluster-chip">
+        <div>
+          <div class="cluster-name">Cluster B</div>
+          <div class="cluster-votes mono">1 / 2 votes</div>
+        </div>
+        <span class="cluster-status risk">⚠ At risk</span>
+      </div>
+    </div>
+
+    <!-- Cluster A agents -->
+    <p class="divider-label">Cluster A</p>
+    <div class="agents-grid" style="margin-bottom:24px">
+
+      <div class="agent-card" onclick="showDetail('pve01')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">pve01.home</div>
+            <div class="agent-os">linux · Proxmox VE 8.2</div>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">pve-node</span>
+          <span class="role-badge">v1.0.0</span>
+        </div>
+        <div class="last-seen">last seen 8s ago</div>
+      </div>
+
+      <div class="agent-card" onclick="showDetail('pve02')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">pve02.home</div>
+            <div class="agent-os">linux · Proxmox VE 8.2</div>
+          </div>
+          <span class="badge badge-update">update-available</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">pve-node</span>
+          <span class="role-badge">v1.0.0</span>
+        </div>
+        <div class="last-seen">last seen 12s ago</div>
+      </div>
+
+      <div class="agent-card" onclick="showDetail('pve03')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">pve03.home</div>
+            <div class="agent-os">linux · Proxmox VE 8.2</div>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">pve-node</span>
+          <span class="role-badge">v1.0.0</span>
+        </div>
+        <div class="last-seen">last seen 5s ago</div>
+      </div>
+
+    </div>
+
+    <!-- Cluster B agents -->
+    <p class="divider-label">Cluster B</p>
+    <div class="agents-grid" style="margin-bottom:24px">
+
+      <div class="agent-card" onclick="showDetail('pbs')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">backup.home</div>
+            <div class="agent-os">linux · Debian 12</div>
+          </div>
+          <span class="badge badge-offline">offline</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">pbs</span>
+          <span class="role-badge">v0.9.2</span>
+        </div>
+        <div class="last-seen">last seen 4m ago</div>
+      </div>
+
+      <div class="agent-card" onclick="showDetail('ups')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">ups-host.home</div>
+            <div class="agent-os">linux · Debian 12</div>
+          </div>
+          <span class="badge badge-online">online</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">ups-host</span>
+          <span class="role-badge">v1.0.0</span>
+        </div>
+        <div class="last-seen">last seen 3s ago</div>
+      </div>
+
+    </div>
+
+    <!-- Standalone -->
+    <p class="divider-label">Standalone</p>
+    <div class="agents-grid">
+      <div class="agent-card" onclick="showDetail('win')">
+        <div class="agent-card-header">
+          <div>
+            <div class="agent-hostname">workstation.home</div>
+            <div class="agent-os">windows · Windows 11</div>
+          </div>
+          <span class="badge badge-error">error</span>
+        </div>
+        <div class="agent-card-meta">
+          <span class="role-badge">controlled</span>
+          <span class="role-badge">v1.0.0</span>
+        </div>
+        <div class="last-seen">last seen 2m ago</div>
+      </div>
+
+      <div class="agent-card" style="border-style:dashed;cursor:default;display:flex;align-items:center;justify-content:center;min-height:100px;opacity:0.4">
+        <div style="text-align:center">
+          <div style="font-size:22px;color:var(--flux-dim);margin-bottom:4px">+</div>
+          <div style="font-size:12px;color:var(--flux-dim)">Enroll a machine</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════ MACHINE DETAIL VIEW ═══════════════════ -->
+<div class="view" id="view-detail">
+  <div style="max-width:900px">
+
+    <div class="detail-header">
+      <div class="detail-back" onclick="showView('machines')">← Machines</div>
+      <div class="detail-title-row">
+        <span class="detail-hostname">pve02.home</span>
+        <span class="badge badge-update">update-available</span>
+      </div>
+      <div class="detail-meta">
+        <span class="detail-meta-item">pve-node</span>
+        <span class="detail-meta-sep">·</span>
+        <span class="detail-meta-item">linux</span>
+        <span class="detail-meta-sep">·</span>
+        <span class="detail-meta-item">v1.0.0</span>
+        <span class="detail-meta-sep">·</span>
+        <span class="detail-meta-item">last seen 12s ago</span>
+      </div>
+    </div>
+
+    <!-- Update banner -->
+    <div class="update-banner">
+      <div>
+        <div class="update-banner-text">🔺 Update available</div>
+        <div class="update-banner-version">v1.0.0 → v1.1.0 · GitHub Release</div>
+      </div>
+      <button class="btn btn-primary btn-sm">Trigger Update</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('overview')">Overview</div>
+      <div class="tab" onclick="showTab('config')">Config</div>
+      <div class="tab" onclick="showTab('events')">Events</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-content active" id="tab-overview">
+
+      <div class="actions-row">
+        <button class="btn btn-ghost btn-sm">Push Config</button>
+        <button class="btn btn-ghost btn-sm">Re-enroll</button>
+        <button class="btn btn-danger btn-sm">Delete</button>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Machine Info</p>
+        <div class="info-grid">
+          <div class="info-item"><label>State</label><value><span class="badge badge-update" style="font-size:12px">update-available</span></value></div>
+          <div class="info-item"><label>Role</label><value>pve-node</value></div>
+          <div class="info-item"><label>OS</label><value>linux</value></div>
+          <div class="info-item"><label>Virtualization</label><value>bare-metal</value></div>
+          <div class="info-item"><label>Agent Version</label><value>v1.0.0</value></div>
+          <div class="info-item"><label>Capabilities</label><value>pve, shutdown</value></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Cluster &amp; UPS</p>
+        <div class="info-grid">
+          <div class="info-item"><label>Cluster</label><value>Cluster A</value></div>
+          <div class="info-item"><label>Votes</label><value>1</value></div>
+          <div class="info-item"><label>UPS Group</label><value>UPS-1 (Device #2)</value></div>
+          <div class="info-item"><label>Shutdown Order</label><value>0</value></div>
+          <div class="info-item"><label>Shutdown Delay</label><value>0 s</value></div>
+          <div class="info-item"><label>Shutdown Timeout</label><value>120 s</value></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Update Policy</p>
+        <div class="info-grid">
+          <div class="info-item"><label>Policy</label><value>manual</value></div>
+          <div class="info-item"><label>Schedule</label><value>—</value></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONFIG TAB -->
+    <div class="tab-content" id="tab-config">
+      <div class="card">
+        <p class="card-title">Shutdown Settings</p>
+        <div class="form-grid form-section">
+          <div class="form-group"><label>Shutdown Delay (s)</label><input type="number" value="0"></div>
+          <div class="form-group"><label>Shutdown Timeout (s)</label><input type="number" value="120"></div>
+          <div class="form-group"><label>Shutdown Order</label><input type="number" value="0"></div>
+          <div class="form-group"><label>UPS Group Device ID</label><input type="number" value="2"></div>
+          <div class="form-group"><label>Cluster ID</label><input type="text" value="cluster-a"></div>
+          <div class="form-group"><label>Cluster Votes</label><input type="number" value="1"></div>
+        </div>
+
+        <div class="form-section">
+          <p class="form-section-title" style="margin-bottom:8px">Update Policy</p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Policy</label>
+              <select>
+                <option>manual</option>
+                <option>auto</option>
+                <option>scheduled</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Schedule (cron, if scheduled)</label><input type="text" placeholder="0 3 * * 0"></div>
+          </div>
+        </div>
+
+        <!-- Collapsible config sections -->
+        <div class="form-section">
+          <p class="form-section-title" style="margin-bottom:8px">Proxmox Config</p>
+          <div class="collapsible-header" onclick="toggleCollapse(this)">
+            <span>pveConfig</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="collapsible-body">
+            <div class="form-grid">
+              <div class="form-group"><label>PVE URL</label><input type="text" value="https://192.168.1.10:8006"></div>
+              <div class="form-group"><label>Node Name</label><input type="text" value="pve02"></div>
+              <div class="form-group"><label>Token ID</label><input type="text" value="root@pam!flux"></div>
+              <div class="form-group"><label>Token Secret</label><input type="password" value="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+            </div>
+          </div>
+
+          <div class="collapsible-header" onclick="toggleCollapse(this)" style="margin-top:8px">
+            <span>pbsConfig</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="collapsible-body" style="margin-top:-8px">
+            <div class="form-grid">
+              <div class="form-group"><label>PBS URL</label><input type="text" placeholder="https://192.168.1.20:8007"></div>
+              <div class="form-group"><label>Token ID</label><input type="text" placeholder="root@pam!flux"></div>
+              <div class="form-group"><label>Token Secret</label><input type="password" placeholder=""></div>
+              <div class="form-group"><label>Job Abort Timeout (s)</label><input type="number" value="120"></div>
+            </div>
+          </div>
+
+          <div class="collapsible-header" onclick="toggleCollapse(this)" style="margin-top:8px">
+            <span>nutConfig</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="collapsible-body" style="margin-top:-8px">
+            <div class="form-grid">
+              <div class="form-group"><label>UPS Name</label><input type="text" placeholder="ups"></div>
+              <div class="form-group"><label>Driver</label><input type="text" placeholder="usbhid-ups"></div>
+              <div class="form-group"><label>Port</label><input type="text" placeholder="auto"></div>
+              <div class="form-group"><label>upsd Port</label><input type="number" value="3493"></div>
+              <div class="form-group"><label>upsd User</label><input type="text" placeholder="admin"></div>
+              <div class="form-group"><label>Description</label><input type="text" placeholder="APC Back-UPS 1500"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-primary btn-sm">Save &amp; Push Config</button>
+          <button class="btn btn-ghost btn-sm">Save Only</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EVENTS TAB -->
+    <div class="tab-content" id="tab-events">
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="events-table">
+          <thead>
+            <tr>
+              <th>Transition</th>
+              <th>Detail</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-muted)">online</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-accent)">update-available</span></td>
+              <td style="color:var(--flux-muted)">v1.1.0 available on GitHub</td>
+              <td class="mono" style="color:var(--flux-dim)">2 min ago</td>
+            </tr>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-dim)">offline</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-healthy)">online</span></td>
+              <td style="color:var(--flux-muted)">Agent reconnected — machineKey verified</td>
+              <td class="mono" style="color:var(--flux-dim)">18 min ago</td>
+            </tr>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-warning)">shutting-down</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-dim)">offline</span></td>
+              <td style="color:var(--flux-muted)">OS shutdown complete</td>
+              <td class="mono" style="color:var(--flux-dim)">19 min ago</td>
+            </tr>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-warning)">ha-freezing</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-warning)">shutting-down</span></td>
+              <td style="color:var(--flux-muted)">HA frozen — signaling OS shutdown</td>
+              <td class="mono" style="color:var(--flux-dim)">19 min ago</td>
+            </tr>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-healthy)">online</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-warning)">ha-freezing</span></td>
+              <td style="color:var(--flux-muted)">UPS OB+LB — freezing cluster HA</td>
+              <td class="mono" style="color:var(--flux-dim)">19 min ago</td>
+            </tr>
+            <tr>
+              <td><span class="mono" style="color:var(--flux-info)">pending</span><span class="state-arrow">→</span><span class="mono" style="color:var(--flux-healthy)">online</span></td>
+              <td style="color:var(--flux-muted)">Enrollment complete — machineKey issued</td>
+              <td class="mono" style="color:var(--flux-dim)">2 days ago</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════ ENROLLMENT MODAL ═══════════════════ -->
+<div class="modal-overlay" id="enroll-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Enroll New Machine</span>
+      <button class="modal-close" onclick="document.getElementById('enroll-modal').classList.remove('open')">×</button>
+    </div>
+    <p class="token-label">Enrollment Token</p>
+    <div class="token-box">a3f9e2b1c8d047f6e5a2b9c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3</div>
+    <p class="copy-hint">↑ Copy this token — it expires in 15 minutes</p>
+    <p class="countdown">⏱ 14:47 remaining</p>
+    <div class="install-cmd">
+      <div class="cmd-label">Run on the target machine:</div>
+      curl -fsSL https://flux.home/install-agent.sh | bash
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="document.getElementById('enroll-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  if (name === 'machines') {
+    document.getElementById('view-machines').classList.add('active');
+    document.getElementById('nav-machines').classList.add('active');
+  } else if (name === 'detail') {
+    document.getElementById('view-detail').classList.add('active');
+    document.getElementById('nav-machines').classList.add('active');
+  }
+}
+
+function showDetail(id) {
+  showView('detail');
+  // Could customize per id — left as static for preview
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleCollapse(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+</script>
+</body>
+</html>

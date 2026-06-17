@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+if ! id -u flux > /dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin flux
+fi
+
+mkdir -p /var/lib/flux
+chown flux:flux /var/lib/flux
+chmod 750 /var/lib/flux
+
+mkdir -p /etc/flux
+
+if [ ! -f /etc/flux/flux.env ]; then
+    JWT_SECRET=$(openssl rand -hex 32)
+    sed "s/JWT_SECRET=PLACEHOLDER/JWT_SECRET=${JWT_SECRET}/" \
+        /opt/flux/installer/linux/flux.env.template > /etc/flux/flux.env
+    chmod 640 /etc/flux/flux.env
+    chown root:flux /etc/flux/flux.env
+fi
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    systemctl enable flux
+    systemctl start flux || true
+    # Enable one-click self-updates
+    if [ -f /lib/systemd/system/flux-updater.path ]; then
+        systemctl enable --now flux-updater.path || true
+        touch /var/lib/flux/.updater-installed
+        chown flux:flux /var/lib/flux/.updater-installed 2>/dev/null || true
+    fi
+fi
+
+echo "Flux installed. Access at http://localhost:5174"

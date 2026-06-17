@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: flux-backend
+    restart: unless-stopped
+    ports:
+      - "5174:5174"
+    environment:
+      - NODE_ENV=production
+      - PORT=5174
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env before starting Flux}
+      - DB_PATH=/app/data/flux.db
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - FRONTEND_URL=${FRONTEND_URL:-}
+      # Empty UPDATER_TOKEN keeps one-click updates off (mode reports "manual")
+      - UPDATER_TOKEN=${UPDATER_TOKEN:-}
+      - UPDATER_URL=http://updater:9275
+    volumes:
+      - ./backend/data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5174/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: flux-frontend
+    restart: unless-stopped
+    ports:
+      - "7483:80"
+    depends_on:
+      - backend
+
+  # Self-update sidecar: rebuilds backend/frontend via the host Docker daemon.
+  # The repo is mounted at its HOST path so bind mounts in this file resolve
+  # identically when the sidecar runs `docker compose up` against the host.
+  updater:
+    build: ./updater
+    container_name: flux-updater
+    restart: unless-stopped
+    environment:
+      - UPDATER_TOKEN=${UPDATER_TOKEN:-}
+      - REPO_DIR=${PWD}
+    working_dir: ${PWD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}:${PWD}
+      - ${HOME}/.ssh:/root/.ssh:ro

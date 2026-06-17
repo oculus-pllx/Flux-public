@@ -1,0 +1,8 @@
+Package: flux
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Parallax Group <oculusparallax@gmail.com>
+Description: Flux UPS monitoring dashboard
+ Full-stack UPS monitoring with NUT protocol support, agent-based
+ homelab shutdown orchestration, and Proxmox/PBS integration.
+Homepage: https://github.com/oculus-pllx/FLux

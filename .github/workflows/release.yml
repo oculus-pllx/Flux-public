@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install root deps
+        run: npm install
+
+      - name: Install frontend deps
+        run: cd frontend && npm install
+
+      - name: Install backend deps (production only)
+        run: cd backend && npm install --omit=dev
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Install NSSM
+        run: |
+          choco install nssm -y
+          Copy-Item (Get-Command nssm).Source "installer\windows\nssm.exe"
+
+      - name: Bundle Node.js runtime
+        run: |
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v18.20.4/node-v18.20.4-win-x64.zip" -OutFile "$env:TEMP\node.zip"
+          Expand-Archive -Path "$env:TEMP\node.zip" -DestinationPath "$env:TEMP\node"
+          Copy-Item "$env:TEMP\node\node-v18.20.4-win-x64\node.exe" "installer\windows\node.exe"
+
+      - name: Build tray exe (Electron)
+        run: npm run build:tray:win
+
+      - name: Create dist-installer dir
+        run: mkdir dist-installer
+
+      - name: Install NSIS and build installer
+        run: |
+          choco install nsis -y
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer\windows\flux.nsi
+
+      - name: Upload installer to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-installer/Flux-Setup.exe
+          generate_release_notes: true

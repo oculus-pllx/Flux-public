@@ -1,0 +1,8 @@
+[Unit]
+Description=Watch for Flux update requests
+
+[Path]
+PathExists=/var/lib/flux/update-requested
+
+[Install]
+WantedBy=multi-user.target

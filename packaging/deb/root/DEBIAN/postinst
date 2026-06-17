@@ -1,0 +1,36 @@
+#!/bin/bash
+set -e
+
+# Create flux system user if not present
+if ! id -u flux >/dev/null 2>&1; then
+  useradd --system --no-create-home --shell /sbin/nologin flux
+fi
+
+# Create data directory with correct ownership
+mkdir -p /var/lib/flux
+chown flux:flux /var/lib/flux
+chmod 750 /var/lib/flux
+
+# Copy .env.example to .env if no config exists yet
+if [ ! -f /etc/flux/.env ]; then
+  # Generate a random JWT_SECRET
+  JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' | head -c 64)
+  sed "s/change-me-before-production/${JWT_SECRET}/" /etc/flux/.env.example > /etc/flux/.env
+  chmod 600 /etc/flux/.env
+  echo "flux: generated /etc/flux/.env with random JWT_SECRET"
+  echo "flux: edit /etc/flux/.env before starting (set PORT, SMTP settings, etc.)"
+fi
+
+# Reload and enable service
+systemctl daemon-reload
+systemctl enable flux.service
+
+# Enable one-click self-updates (path unit watches the trigger file the
+# unprivileged backend writes; marker tells the backend updates are available)
+if [ -f /lib/systemd/system/flux-updater.path ]; then
+  systemctl enable --now flux-updater.path || true
+  touch /var/lib/flux/.updater-installed
+  chown flux:flux /var/lib/flux/.updater-installed 2>/dev/null || true
+fi
+
+echo "flux: run 'systemctl start flux' to start the server"
