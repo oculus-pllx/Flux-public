@@ -36,9 +36,9 @@ npm run build --silent
 # 3. Copy app files
 echo "==> Copying app files..."
 APP="${ROOT}/opt/flux"
-mkdir -p "${APP}/backend" "${APP}/frontend"
+mkdir -p "${APP}/backend" "${APP}/frontend/dist"
 cp -r "${REPO_ROOT}/backend/." "${APP}/backend/"
-cp -r "${REPO_ROOT}/frontend/dist/." "${APP}/backend/public/"
+cp -r "${REPO_ROOT}/frontend/dist/." "${APP}/frontend/dist/"
 
 # Install production backend deps inside the package
 echo "==> Installing backend production dependencies..."
