@@ -61,7 +61,7 @@ describe('POST /api/devices/discover-nut', () => {
     expect(res.body.nutMissing).toBe(false)
   })
 
-  it('returns discovered config when a UPS exists', async () => {
+  it('uses the SSH host when NUT listens on all interfaces', async () => {
     mockSsh({
       upsNames: 'ups\n',
       upsdConf: 'LISTEN 0.0.0.0 3493\n',
@@ -70,7 +70,7 @@ describe('POST /api/devices/discover-nut', () => {
     const res = await request(app).post('/api/devices/discover-nut').set(auth).send(sshBody)
     expect(res.status).toBe(200)
     expect(res.body.upsNames).toEqual(['ups'])
-    expect(res.body.nutHost).toBe('0.0.0.0')
+    expect(res.body.nutHost).toBe(sshBody.host)
     expect(res.body.nutUsername).toBe('fluxmon')
   })
 })

@@ -85,14 +85,16 @@ async function discoverNut(machine) {
     throw err
   }
 
-  // LISTEN address from upsd.conf — prefer non-loopback, fall back to SSH host
+  // LISTEN address from upsd.conf — prefer concrete non-loopback, fall back to SSH host.
+  // Wildcard binds are not connectable remote endpoints.
   let nutHost = machine.host
   let nutPort = 3493
   for (const line of upsdConf.split('\n')) {
     const m = line.trim().match(/^LISTEN\s+(\S+)\s+(\d+)/)
-    if (m && m[1] !== '127.0.0.1' && m[1] !== '::1' && m[1] !== 'localhost') {
+    if (m && !['127.0.0.1', '::1', 'localhost', '0.0.0.0', '::'].includes(m[1])) {
       nutHost = m[1]; nutPort = Number(m[2]); break
     }
+    if (m) nutPort = Number(m[2])
   }
 
   // Monitor user from upsd.users — find user with upsmon master/slave/primary/secondary
