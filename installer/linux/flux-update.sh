@@ -7,7 +7,7 @@ DATA_DIR="/var/lib/flux"
 LOG="${DATA_DIR}/update.log"
 STATUS="${DATA_DIR}/update-status.json"
 INSTALL_DIR="/opt/flux"
-REPO="oculus-pllx/Flux"
+REPO="oculus-pllx/Flux-public"
 SERVICE="flux"
 
 rm -f "${DATA_DIR}/update-requested"

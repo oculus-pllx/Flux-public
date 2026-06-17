@@ -5,7 +5,7 @@
 ## Docker (recommended)
 
 ```bash
-git clone https://github.com/oculus-pllx/FLux.git
+git clone https://github.com/oculus-pllx/Flux-public.git
 cd Flux
 cp .env.example .env        # set JWT_SECRET at minimum
 docker compose up -d

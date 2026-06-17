@@ -29,7 +29,7 @@ const RELEASE = {
   tag_name: 'v9.9.9',
   assets: [{
     name: 'flux-agent-9.9.9.tar.gz',
-    browser_download_url: 'https://github.com/oculus-pllx/FLux/releases/download/v9.9.9/flux-agent-9.9.9.tar.gz',
+    browser_download_url: 'https://github.com/oculus-pllx/Flux-public/releases/download/v9.9.9/flux-agent-9.9.9.tar.gz',
   }],
 }
 

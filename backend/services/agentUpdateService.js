@@ -3,7 +3,7 @@ const AgentMachine = require('../models/AgentMachine')
 const agentHub = require('./agentHub')
 const githubService = require('./githubService')
 
-const GITHUB_REPO = 'oculus-pllx/Flux'
+const GITHUB_REPO = 'oculus-pllx/Flux-public'
 const CURRENT_VERSION = require('../package.json').version
 
 async function getLatestRelease() {

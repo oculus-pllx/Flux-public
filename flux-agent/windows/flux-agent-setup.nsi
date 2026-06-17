@@ -8,7 +8,7 @@
 !define APP_NAME        "Flux Agent"
 !define APP_VERSION     "1.0.0"
 !define APP_PUBLISHER   "Parallax Group"
-!define APP_URL         "https://github.com/oculus-pllx/FLux"
+!define APP_URL         "https://github.com/oculus-pllx/Flux-public"
 !define SERVICE_NAME    "FluxAgent"
 !define SERVICE_DISPLAY "Flux Agent"
 !define REG_UNINSTALL   "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SERVICE_NAME}"

@@ -144,7 +144,7 @@ README should document both Linux install paths:
 - Native Flux server install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux-public/main/install.sh | sudo bash
 ```
 
 - Linux agent install from a running Flux server:

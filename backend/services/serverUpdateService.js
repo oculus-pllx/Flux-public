@@ -3,7 +3,7 @@ const path = require('path')
 const http = require('http')
 const { getLatestRelease, compareVersions } = require('./githubService')
 
-const GITHUB_REPO     = 'oculus-pllx/Flux'
+const GITHUB_REPO     = 'oculus-pllx/Flux-public'
 const CURRENT_VERSION = require('../package.json').version
 const CACHE_TTL_MS    = 10 * 60 * 1000
 
