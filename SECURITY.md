@@ -13,7 +13,7 @@ Only the latest minor release receives security fixes.
 
 Please report vulnerabilities **privately** — do not open a public issue.
 
-- Preferred: open a [GitHub security advisory](https://github.com/oculus-pllx/Flux-public/security/advisories/new)
+- Preferred: open a [GitHub security advisory](https://github.com/oculus-pllx/Flux-Controller/security/advisories/new)
 - The report should include a description, reproduction steps, and affected version.
 
 You will get an acknowledgement within a week. Fixes ship in the next release with

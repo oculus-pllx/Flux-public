@@ -133,6 +133,7 @@ router.put('/:id', requireRole('admin', 'operator'), async (req, res, next) => {
     if (!m) return res.status(404).json({ error: 'Not found' })
 
     const allowed = ['role', 'shutdownDelay', 'shutdownTimeout', 'shutdownOrder', 'upsGroupId',
+      'clusterId', 'clusterVotes',
       'deviceGroupId', 'upsOutlet', 'upsOutletBatteryBacked',
       'updatePolicy', 'updateSchedule', 'active', 'pveConfig',
       'pbsConfig', 'nutConfig', 'notes']

@@ -6,7 +6,7 @@ const githubService = require('./githubService')
 const CURRENT_VERSION = require('../package.json').version
 
 function githubRepo() {
-  return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-public'
+  return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-Controller'
 }
 
 function hasGithubToken() {

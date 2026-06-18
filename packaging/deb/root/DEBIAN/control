@@ -5,4 +5,4 @@ Maintainer: Parallax Group <oculusparallax@gmail.com>
 Description: Flux UPS monitoring dashboard
  Full-stack UPS monitoring with NUT protocol support, agent-based
  homelab shutdown orchestration, and Proxmox/PBS integration.
-Homepage: https://github.com/oculus-pllx/Flux-public
+Homepage: https://github.com/oculus-pllx/Flux-Controller

@@ -9,7 +9,7 @@ A self-hosted dashboard for UPS monitoring and graceful ordered shutdown. Connec
 ## Quick Start — Docker
 
 ```bash
-git clone https://github.com/oculus-pllx/Flux-public.git
+git clone https://github.com/oculus-pllx/Flux-Controller.git
 cd Flux
 cp .env.example .env      # set JWT_SECRET at minimum
 docker compose up -d
@@ -29,7 +29,7 @@ docker compose up -d --build
 For a bare-metal or VM install on Linux, run the installer as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux-public/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux-Controller/main/install.sh | sudo bash
 ```
 
 On Debian/Ubuntu amd64, the installer downloads the latest `.deb` release, creates the `flux` systemd service, writes `/etc/flux/.env`, and stores data in `/var/lib/flux`. Other Linux targets fall back to a source install under `/opt/flux`.
@@ -288,7 +288,7 @@ Express backend
 ## Development
 
 ```bash
-git clone https://github.com/oculus-pllx/Flux-public.git
+git clone https://github.com/oculus-pllx/Flux-Controller.git
 cd Flux
 make install && make setup
 

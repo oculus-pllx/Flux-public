@@ -105,6 +105,26 @@ describe('PUT /api/agents/:id', () => {
     await m.reload()
     expect(m.upsGroupId).toBe(ups.id)
   })
+
+  it('updates cluster metadata from the machine detail form', async () => {
+    const m = await AgentMachine.create({
+      machineKey: 'cluster-key',
+      hostname: 'cluster-host',
+      role: 'pve-node',
+      clusterId: null,
+      clusterVotes: 1,
+    })
+
+    const res = await request(app).put(`/api/agents/${m.id}`).set(auth)
+      .send({ clusterId: 'sms-pve', clusterVotes: 2 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.clusterId).toBe('sms-pve')
+    expect(res.body.clusterVotes).toBe(2)
+    await m.reload()
+    expect(m.clusterId).toBe('sms-pve')
+    expect(m.clusterVotes).toBe(2)
+  })
 })
 
 describe('PUT /api/agents/:id — upsOutlet field', () => {

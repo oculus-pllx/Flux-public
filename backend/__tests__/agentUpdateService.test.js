@@ -29,7 +29,7 @@ const RELEASE = {
   tag_name: 'v9.9.9',
   assets: [{
     name: 'flux-agent-9.9.9.tar.gz',
-    browser_download_url: 'https://github.com/oculus-pllx/Flux-public/releases/download/v9.9.9/flux-agent-9.9.9.tar.gz',
+    browser_download_url: 'https://github.com/oculus-pllx/Flux-Controller/releases/download/v9.9.9/flux-agent-9.9.9.tar.gz',
   }],
 }
 
@@ -110,7 +110,7 @@ describe('agentUpdateService', () => {
     })
 
     it('uses FLUX_GITHUB_REPO when checking for agent releases', async () => {
-      process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-private'
+      process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-Controller'
       jest.mock('https')
       jest.mock('../models/AgentMachine')
       jest.mock('../services/agentHub', () => ({ sendToMachine: jest.fn() }))
@@ -129,7 +129,7 @@ describe('agentUpdateService', () => {
       const { getLatestRelease } = require('../services/agentUpdateService')
       await getLatestRelease()
       expect(https2.request).toHaveBeenCalledWith(
-        expect.objectContaining({ path: '/repos/oculus-pllx/Flux-private/releases/latest' }),
+        expect.objectContaining({ path: '/repos/oculus-pllx/Flux-Controller/releases/latest' }),
         expect.any(Function),
       )
     })

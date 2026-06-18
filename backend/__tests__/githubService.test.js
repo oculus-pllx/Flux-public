@@ -37,7 +37,7 @@ describe('githubService', () => {
         published_at: '2026-06-01T00:00:00Z',
         assets: [{ name: 'flux-agent-2.1.0.tar.gz', browser_download_url: 'https://x/y.tar.gz' }],
       })
-      const r = await getLatestRelease('oculus-pllx/Flux-public')
+      const r = await getLatestRelease('oculus-pllx/Flux-Controller')
       expect(r).toMatchObject({
         tag: 'v2.1.0',
         version: '2.1.0',
@@ -49,7 +49,7 @@ describe('githubService', () => {
 
     it('rejects on non-200 with statusCode on the error', async () => {
       mockGitHubResponse(404, '{}')
-      await expect(getLatestRelease('oculus-pllx/Flux-public')).rejects.toMatchObject({
+      await expect(getLatestRelease('oculus-pllx/Flux-Controller')).rejects.toMatchObject({
         message: 'GitHub API returned 404',
         statusCode: 404,
       })

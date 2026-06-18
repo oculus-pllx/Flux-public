@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Flux Server Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux-public/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/oculus-pllx/Flux-Controller/main/install.sh | bash
 # Or:    bash install.sh
 set -euo pipefail
 
-REPO="oculus-pllx/Flux-public"
+REPO="oculus-pllx/Flux-Controller"
 RELEASE_API="https://api.github.com/repos/${REPO}/releases/latest"
 SERVICE_NAME="flux"
 INSTALL_DIR="/opt/flux"

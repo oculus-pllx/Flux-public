@@ -69,7 +69,7 @@ Render the manual command/instructions whenever `status.mode === 'manual'`.
 ### Task 4: Verification, Mirror, Release, and Instance Update
 
 **Files:**
-- Mirror changed files to `/srv/ccc/projects/Flux-public`
+- Mirror changed files to `/srv/ccc/projects/Flux-Controller`
 
 - [x] **Step 1: Run targeted backend tests**
 
@@ -81,7 +81,7 @@ Run: `npm run build` in `frontend`.
 
 - [x] **Step 3: Mirror to public repo and repeat verification**
 
-Apply the private diff to `/srv/ccc/projects/Flux-public`, then run the same tests/build.
+Apply the private diff to `/srv/ccc/projects/Flux-Controller`, then run the same tests/build.
 
 - [ ] **Step 4: Commit and push both repos**
 

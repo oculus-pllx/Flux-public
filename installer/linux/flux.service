@@ -1,6 +1,6 @@
 [Unit]
 Description=Flux UPS Monitor
-Documentation=https://github.com/oculus-pllx/Flux-public
+Documentation=https://github.com/oculus-pllx/Flux-Controller
 After=network.target
 
 [Service]

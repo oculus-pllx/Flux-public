@@ -7,7 +7,7 @@ const CURRENT_VERSION = require('../package.json').version
 const CACHE_TTL_MS    = 10 * 60 * 1000
 
 function githubRepo() {
-  return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-public'
+  return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-Controller'
 }
 
 function hasGithubToken() {

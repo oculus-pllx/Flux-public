@@ -87,12 +87,12 @@ describe('getStatus', () => {
   })
 
   it('uses FLUX_GITHUB_REPO for public repo update checks and manual command hints', async () => {
-    process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-public'
+    process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-Controller'
     gh().getLatestRelease.mockResolvedValue({ tag: 'v99.0.0', version: '99.0.0', publishedAt: null, notes: '', assets: [] })
     const s = await svc().getStatus()
-    expect(gh().getLatestRelease).toHaveBeenCalledWith('oculus-pllx/Flux-public')
-    expect(s.repo).toBe('oculus-pllx/Flux-public')
-    expect(s.manualCommand).toContain('Flux-public')
+    expect(gh().getLatestRelease).toHaveBeenCalledWith('oculus-pllx/Flux-Controller')
+    expect(s.repo).toBe('oculus-pllx/Flux-Controller')
+    expect(s.manualCommand).toContain('Flux-Controller')
   })
 })
 
