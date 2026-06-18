@@ -23,7 +23,11 @@ function mockGitHubResponse(statusCode, body) {
 const { getLatestRelease, compareVersions } = require('../services/githubService')
 
 describe('githubService', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.GITHUB_TOKEN
+    delete process.env.GH_TOKEN
+  })
 
   describe('getLatestRelease', () => {
     it('parses tag, version, notes, publishedAt, and assets', async () => {
@@ -43,9 +47,12 @@ describe('githubService', () => {
       expect(r.assets).toHaveLength(1)
     })
 
-    it('rejects on non-200', async () => {
+    it('rejects on non-200 with statusCode on the error', async () => {
       mockGitHubResponse(404, '{}')
-      await expect(getLatestRelease('oculus-pllx/Flux-public')).rejects.toThrow('GitHub API returned 404')
+      await expect(getLatestRelease('oculus-pllx/Flux-public')).rejects.toMatchObject({
+        message: 'GitHub API returned 404',
+        statusCode: 404,
+      })
     })
 
     it('requests the repo it was given', async () => {
@@ -53,6 +60,18 @@ describe('githubService', () => {
       await getLatestRelease('someone/SomeRepo')
       expect(https.request).toHaveBeenCalledWith(
         expect.objectContaining({ path: '/repos/someone/SomeRepo/releases/latest' }),
+        expect.any(Function),
+      )
+    })
+
+    it('uses a GitHub token when one is configured', async () => {
+      process.env.GITHUB_TOKEN = 'ghp_test_token'
+      mockGitHubResponse(200, { tag_name: 'v1.0.0', assets: [] })
+      await getLatestRelease('someone/PrivateRepo')
+      expect(https.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer ghp_test_token' }),
+        }),
         expect.any(Function),
       )
     })

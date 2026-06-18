@@ -37,6 +37,9 @@ describe('agentUpdateService', () => {
   beforeEach(() => {
     jest.resetModules()
     jest.clearAllMocks()
+    delete process.env.FLUX_GITHUB_REPO
+    delete process.env.GITHUB_TOKEN
+    delete process.env.GH_TOKEN
   })
 
   describe('getLatestRelease', () => {
@@ -104,6 +107,31 @@ describe('agentUpdateService', () => {
       })
       const { getLatestRelease } = require('../services/agentUpdateService')
       await expect(getLatestRelease()).rejects.toThrow('No flux-agent tarball')
+    })
+
+    it('uses FLUX_GITHUB_REPO when checking for agent releases', async () => {
+      process.env.FLUX_GITHUB_REPO = 'oculus-pllx/Flux-private'
+      jest.mock('https')
+      jest.mock('../models/AgentMachine')
+      jest.mock('../services/agentHub', () => ({ sendToMachine: jest.fn() }))
+      const https2 = require('https')
+      const mockReq = { on: jest.fn(), end: jest.fn() }
+      https2.request.mockImplementationOnce((opts, cb) => {
+        process.nextTick(() => {
+          const res = {
+            statusCode: 200,
+            on: jest.fn((ev, h) => { if (ev === 'data') h(JSON.stringify(RELEASE)); if (ev === 'end') h() }),
+          }
+          cb(res)
+        })
+        return mockReq
+      })
+      const { getLatestRelease } = require('../services/agentUpdateService')
+      await getLatestRelease()
+      expect(https2.request).toHaveBeenCalledWith(
+        expect.objectContaining({ path: '/repos/oculus-pllx/Flux-private/releases/latest' }),
+        expect.any(Function),
+      )
     })
   })
 
@@ -189,6 +217,34 @@ describe('agentUpdateService', () => {
       const { checkAndNotify } = require('../services/agentUpdateService')
       // Should resolve without throwing (errors are swallowed)
       await expect(checkAndNotify()).resolves.not.toThrow()
+    })
+
+    it('does not log a failed update check error for private repo 404s without a GitHub token', async () => {
+      jest.mock('https')
+      jest.mock('../models/AgentMachine')
+      jest.mock('../services/agentHub', () => ({ sendToMachine: jest.fn() }))
+      const https2 = require('https')
+      const mockReq = { on: jest.fn(), end: jest.fn() }
+      https2.request.mockImplementationOnce((opts, cb) => {
+        process.nextTick(() => {
+          const res = {
+            statusCode: 404,
+            on: jest.fn((ev, h) => { if (ev === 'data') h('{}'); if (ev === 'end') h() }),
+          }
+          cb(res)
+        })
+        return mockReq
+      })
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {})
+
+      const { checkAndNotify } = require('../services/agentUpdateService')
+      await expect(checkAndNotify()).resolves.not.toThrow()
+
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('GitHub release check unavailable'))
+      errorSpy.mockRestore()
+      infoSpy.mockRestore()
     })
   })
 

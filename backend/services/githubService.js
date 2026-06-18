@@ -1,22 +1,32 @@
 const https = require('https')
 
+function githubToken() {
+  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
+}
+
 function getLatestRelease(repo) {
   return new Promise((resolve, reject) => {
+    const headers = {
+      'User-Agent': 'flux-server',
+      Accept: 'application/vnd.github.v3+json',
+    }
+    const token = githubToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+
     const opts = {
       hostname: 'api.github.com',
       path: `/repos/${repo}/releases/latest`,
       method: 'GET',
-      headers: {
-        'User-Agent': 'flux-server',
-        Accept: 'application/vnd.github.v3+json',
-      },
+      headers,
     }
     const req = https.request(opts, (res) => {
       let raw = ''
       res.on('data', (chunk) => { raw += chunk })
       res.on('end', () => {
         if (res.statusCode !== 200) {
-          return reject(new Error(`GitHub API returned ${res.statusCode}`))
+          const err = new Error(`GitHub API returned ${res.statusCode}`)
+          err.statusCode = res.statusCode
+          return reject(err)
         }
         try {
           const body = JSON.parse(raw)
