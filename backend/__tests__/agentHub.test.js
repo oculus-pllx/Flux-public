@@ -59,6 +59,40 @@ describe('agentHub', () => {
     ws.close()
   })
 
+  it('uses agent-reported role on first registration only', async () => {
+    const machine = await AgentMachine.create({
+      machineKey: 'first-role-key', hostname: 'first-role-host', role: 'controlled', state: 'offline',
+      lastSeen: null,
+    })
+    const ws = await openWs()
+    ws.send(JSON.stringify({
+      type: 'register', machineKey: 'first-role-key', hostname: 'first-role-host',
+      role: 'pve-node', virtualization: 'none', os: 'Debian 12', agentVersion: '1.0.0',
+      capabilities: [],
+    }))
+    await new Promise(r => setTimeout(r, 100))
+    const updated = await AgentMachine.findByPk(machine.id)
+    expect(updated.role).toBe('pve-node')
+    ws.close()
+  })
+
+  it('preserves an established server-configured role on reconnect', async () => {
+    const machine = await AgentMachine.create({
+      machineKey: 'server-role-key', hostname: 'server-role-host', role: 'ups-host', state: 'offline',
+      lastSeen: new Date(Date.now() - 60_000),
+    })
+    const ws = await openWs()
+    ws.send(JSON.stringify({
+      type: 'register', machineKey: 'server-role-key', hostname: 'server-role-host',
+      role: 'pve-node', virtualization: 'none', os: 'Debian 12', agentVersion: '1.0.0',
+      capabilities: [],
+    }))
+    await new Promise(r => setTimeout(r, 100))
+    const updated = await AgentMachine.findByPk(machine.id)
+    expect(updated.role).toBe('ups-host')
+    ws.close()
+  })
+
   it('closes connection for unknown machineKey', async () => {
     const ws = await openWs()
     ws.send(JSON.stringify({ type: 'register', machineKey: 'no-such-key', hostname: 'x', role: 'controlled' }))

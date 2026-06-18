@@ -109,10 +109,11 @@ async function handleRegister(ws, msg, setKey) {
   if (!machine) { ws.close(1008, 'unknown machineKey'); return }
 
   const updates = {
-    hostname, role, virtualization, os, agentVersion,
+    hostname, virtualization, os, agentVersion,
     capabilities: capabilities || [],
     lastSeen: new Date(),
   }
+  if (shouldAcceptAgentRole(machine, role)) updates.role = role
   // Only update cluster fields if agent reports them; preserve DB values if not sent.
   // upsGroupId is server-authoritative (set via PUT /api/agents/:id) — never overwrite from register.
   if (clusterId !== undefined) updates.clusterId = clusterId != null ? clusterId : null
@@ -123,6 +124,13 @@ async function handleRegister(ws, msg, setKey) {
 
   connections.set(machineKey, ws)
   setKey(machineKey)
+}
+
+function shouldAcceptAgentRole(machine, role) {
+  if (!role) return false
+  if (!AgentMachine.VALID_ROLES.includes(role)) return false
+  if (!machine.lastSeen && (!machine.role || machine.role === 'controlled')) return true
+  return machine.role === role
 }
 
 async function handleStateUpdate(machineKey, newState, detail = null) {

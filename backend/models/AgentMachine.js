@@ -7,11 +7,13 @@ const VALID_STATES = [
   'update-available', 'updating', 'update-failed', 'pending',
 ]
 
+const VALID_ROLES = ['ups-host', 'controlled', 'pve-node', 'pbs', 'both']
+
 const AgentMachine = sequelize.define('AgentMachine', {
   id:               { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   machineKey:       { type: DataTypes.STRING, allowNull: true, unique: true },
   hostname:         { type: DataTypes.STRING, allowNull: false },
-  role:             { type: DataTypes.ENUM('ups-host','controlled','pve-node','pbs','both'), defaultValue: 'controlled' },
+  role:             { type: DataTypes.ENUM(...VALID_ROLES), defaultValue: 'controlled' },
   os:               { type: DataTypes.STRING, allowNull: true },
   agentVersion:     { type: DataTypes.STRING, allowNull: true },
   capabilities:     { type: DataTypes.JSON, defaultValue: [] },
@@ -47,5 +49,6 @@ const AgentMachine = sequelize.define('AgentMachine', {
 })
 
 AgentMachine.VALID_STATES = VALID_STATES
+AgentMachine.VALID_ROLES = VALID_ROLES
 
 module.exports = AgentMachine

@@ -80,6 +80,7 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [asUpsHost, setAsUpsHost] = useState(false)
 
   const candidates = allAgents
     .filter(machine => machine.upsGroupId !== device.id)
@@ -90,8 +91,14 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
     setSaving(true)
     setError('')
     try {
-      await axios.put(`/api/agents/${machineId}`, { upsGroupId: device.id }, { headers })
+      const payload = { upsGroupId: device.id }
+      if (asUpsHost) payload.role = 'ups-host'
+      const { data } = await axios.put(`/api/agents/${machineId}`, payload, { headers })
+      if (asUpsHost && data.machineKey) {
+        await axios.post(`/api/agents/${machineId}/push-config`, data, { headers })
+      }
       setOpen(false)
+      setAsUpsHost(false)
       onAssigned()
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to assign machine')
@@ -143,7 +150,6 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
             disabled={saving}
             defaultValue=""
             onChange={e => assign(e.target.value)}
-            onBlur={() => !saving && setOpen(false)}
             style={{
               background: 'var(--flux-panel)',
               border: '1px solid var(--flux-accent)',
@@ -163,9 +169,27 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
               </option>
             ))}
           </select>
+          <label title="Make this machine the UPS-attached host and push that role to the agent"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--flux-muted)',
+              fontSize: 11,
+              fontFamily: 'IBM Plex Mono, monospace',
+              whiteSpace: 'nowrap',
+            }}>
+            <input
+              type="checkbox"
+              checked={asUpsHost}
+              disabled={saving}
+              onChange={e => setAsUpsHost(e.target.checked)}
+            />
+            UPS host
+          </label>
           <button
             onMouseDown={e => e.preventDefault()}
-            onClick={() => { setOpen(false); setError('') }}
+            onClick={() => { setOpen(false); setError(''); setAsUpsHost(false) }}
             style={{
               background: 'none',
               border: '1px solid var(--flux-border)',
@@ -722,15 +746,20 @@ function MachineRow({ machine, canWrite = false, headers, onRefresh }) {
 function AssignUpsButton({ machine, devices, headers, onAssigned }) {
   const [open,    setOpen]    = useState(false)
   const [saving,  setSaving]  = useState(false)
+  const [asUpsHost, setAsUpsHost] = useState(false)
 
   async function assign(deviceId) {
     setSaving(true)
     try {
-      await axios.put(`/api/agents/${machine.id}`,
-        { upsGroupId: Number(deviceId) }, { headers })
+      const payload = { upsGroupId: Number(deviceId) }
+      if (asUpsHost) payload.role = 'ups-host'
+      const { data } = await axios.put(`/api/agents/${machine.id}`, payload, { headers })
+      if (asUpsHost && data.machineKey) {
+        await axios.post(`/api/agents/${machine.id}/push-config`, data, { headers })
+      }
       onAssigned()
     } catch { /* ignore — next poll will reflect */ }
-    finally { setSaving(false); setOpen(false) }
+    finally { setSaving(false); setOpen(false); setAsUpsHost(false) }
   }
 
   if (!open) return (
@@ -747,22 +776,33 @@ function AssignUpsButton({ machine, devices, headers, onAssigned }) {
   )
 
   return (
-    <select
-      autoFocus
-      disabled={saving}
-      onClick={e => e.stopPropagation()}
-      onChange={e => e.target.value && assign(e.target.value)}
-      defaultValue=""
-      style={{
-        background: 'var(--flux-panel)', border: '1px solid var(--flux-accent)',
-        color: 'var(--flux-text)', fontSize: 11, padding: '2px 6px',
-        borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace',
-      }}>
-      <option value="" disabled>— pick UPS —</option>
-      {devices.map(d => (
-        <option key={d.id} value={d.id}>{d.name}</option>
-      ))}
-    </select>
+    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <select
+        autoFocus
+        disabled={saving}
+        onChange={e => e.target.value && assign(e.target.value)}
+        defaultValue=""
+        style={{
+          background: 'var(--flux-panel)', border: '1px solid var(--flux-accent)',
+          color: 'var(--flux-text)', fontSize: 11, padding: '2px 6px',
+          borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace',
+        }}>
+        <option value="" disabled>— pick UPS —</option>
+        {devices.map(d => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
+      </select>
+      <label title="Make this machine the UPS-attached host and push that role to the agent"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--flux-muted)', fontSize: 11, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+        <input
+          type="checkbox"
+          checked={asUpsHost}
+          disabled={saving}
+          onChange={e => setAsUpsHost(e.target.checked)}
+        />
+        UPS host
+      </label>
+    </div>
   )
 }
 

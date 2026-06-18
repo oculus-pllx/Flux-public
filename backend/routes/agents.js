@@ -132,13 +132,16 @@ router.put('/:id', requireRole('admin', 'operator'), async (req, res, next) => {
     const m = await AgentMachine.findByPk(req.params.id)
     if (!m) return res.status(404).json({ error: 'Not found' })
 
-    const allowed = ['shutdownDelay', 'shutdownTimeout', 'shutdownOrder', 'upsGroupId',
+    const allowed = ['role', 'shutdownDelay', 'shutdownTimeout', 'shutdownOrder', 'upsGroupId',
       'deviceGroupId', 'upsOutlet', 'upsOutletBatteryBacked',
       'updatePolicy', 'updateSchedule', 'active', 'pveConfig',
       'pbsConfig', 'nutConfig', 'notes']
     const updates = {}
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) updates[key] = req.body[key]
+    }
+    if (updates.role !== undefined && !AgentMachine.VALID_ROLES.includes(updates.role)) {
+      return res.status(400).json({ error: `role must be one of: ${AgentMachine.VALID_ROLES.join(', ')}` })
     }
     await m.update(updates)
     res.json(m)

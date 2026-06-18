@@ -68,6 +68,26 @@ describe('PUT /api/agents/:id', () => {
     expect(res.body.updatePolicy).toBe('scheduled')
   })
 
+  it('updates machine role when explicitly configured', async () => {
+    const m = await AgentMachine.create({ machineKey: 'role-key', hostname: 'role-host', role: 'pve-node' })
+    const res = await request(app).put(`/api/agents/${m.id}`).set(auth)
+      .send({ role: 'ups-host' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.role).toBe('ups-host')
+    await m.reload()
+    expect(m.role).toBe('ups-host')
+  })
+
+  it('rejects invalid machine roles', async () => {
+    const m = await AgentMachine.create({ machineKey: 'bad-role-key', hostname: 'bad-role-host', role: 'controlled' })
+    const res = await request(app).put(`/api/agents/${m.id}`).set(auth)
+      .send({ role: 'admin' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/role/i)
+  })
+
   it('assigns an existing control machine to a UPS group', async () => {
     const ups = await Device.create({ name: 'APC 2200', host: '10.11.200.23', upsName: 'apc2200' })
     const m = await AgentMachine.create({

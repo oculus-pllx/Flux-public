@@ -131,6 +131,7 @@ export default function MachineDetail() {
             shutdownDelay:   m.shutdownDelay   ?? 0,
             shutdownTimeout: m.shutdownTimeout ?? 120,
             shutdownOrder:   m.shutdownOrder   ?? 0,
+            role:            m.role            ?? 'controlled',
             upsGroupId:      m.upsGroupId      ?? '',
             clusterId:       m.clusterId       ?? '',
             clusterVotes:    m.clusterVotes    ?? 1,
@@ -229,6 +230,7 @@ export default function MachineDetail() {
       shutdownDelay:   Number(form.shutdownDelay),
       shutdownTimeout: Number(form.shutdownTimeout),
       shutdownOrder:   Number(form.shutdownOrder),
+      role:            form.role,
       upsGroupId:      form.upsGroupId !== '' ? Number(form.upsGroupId) : null,
       upsOutlet:              form.upsOutlet || null,
       upsOutletBatteryBacked: form.upsOutletBatteryBacked === 'true'  ? true
@@ -498,6 +500,16 @@ export default function MachineDetail() {
             Shutdown Settings
           </p>
           <div className="grid grid-cols-2 gap-3 mb-5">
+            <div>
+              <label className="font-sans text-xs block mb-1" style={{ color: 'var(--flux-muted)' }}>Role</label>
+              <select {...f('role')} style={{ ...inputStyle, cursor: 'pointer' }} onFocus={onFocus} onBlur={onBlur}>
+                <option value="controlled">controlled</option>
+                <option value="ups-host">ups-host</option>
+                <option value="pve-node">pve-node</option>
+                <option value="pbs">pbs</option>
+                <option value="both">both</option>
+              </select>
+            </div>
             {[
               ['shutdownDelay',   'Shutdown Delay (s)',   'number'],
               ['shutdownTimeout', 'Shutdown Timeout (s)', 'number'],
