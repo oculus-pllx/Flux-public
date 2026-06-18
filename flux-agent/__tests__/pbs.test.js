@@ -48,6 +48,17 @@ describe('pbs service', () => {
     expect(opts.method).toBe('GET')
   })
 
+  it('uses the PBS API token authorization header format', async () => {
+    setupOnce(200, [])
+    const { listRunningJobs } = require('../services/pbs')
+    await listRunningJobs(PBS_CONFIG)
+
+    const [opts] = https.request.mock.calls[0]
+    expect(opts.headers.Authorization).toBe(
+      `PBSAPIToken=${PBS_CONFIG.tokenId}:${PBS_CONFIG.tokenSecret}`,
+    )
+  })
+
   it('abortJob calls POST /nodes/localhost/tasks/{upid}/status', async () => {
     setupOnce(200, null)
     const { abortJob } = require('../services/pbs')

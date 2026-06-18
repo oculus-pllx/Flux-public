@@ -24,8 +24,20 @@ cp -r backend/config backend/middleware backend/models \
       "$BUILD_DIR/opt/flux/backend/"
 
 cp -r frontend/dist/. "$BUILD_DIR/opt/flux/frontend/dist/"
+cp install-agent.sh "$BUILD_DIR/opt/flux/install-agent.sh"
 cp installer/linux/flux.env.template "$BUILD_DIR/opt/flux/installer/linux/"
 cp installer/linux/flux.service "$BUILD_DIR/lib/systemd/system/flux.service"
+
+echo "Bundling agent installer payload..."
+AGENT_BUILD=$(mktemp -d)
+cp -r flux-agent/. "$AGENT_BUILD/"
+rm -rf "$AGENT_BUILD/node_modules"
+(cd "$AGENT_BUILD" && npm ci --omit=dev --silent)
+tar czf "$BUILD_DIR/opt/flux/install-agent.tar.gz" \
+  --exclude='./__tests__' \
+  --exclude='./windows' \
+  -C "$AGENT_BUILD" .
+rm -rf "$AGENT_BUILD"
 
 # Self-update helper: script + systemd units
 mkdir -p "$BUILD_DIR/opt/flux/bin"
@@ -33,6 +45,7 @@ cp installer/linux/flux-update.sh       "$BUILD_DIR/opt/flux/bin/flux-update.sh"
 cp installer/linux/flux-updater.service "$BUILD_DIR/lib/systemd/system/"
 cp installer/linux/flux-updater.path    "$BUILD_DIR/lib/systemd/system/"
 chmod 755 "$BUILD_DIR/opt/flux/bin/flux-update.sh"
+chmod 755 "$BUILD_DIR/opt/flux/install-agent.sh"
 
 cat > "$BUILD_DIR/DEBIAN/control" <<EOF
 Package: flux

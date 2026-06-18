@@ -47,6 +47,19 @@ describe('runShutdownSequence', () => {
     expect(proxmox.stopAllGuests).not.toHaveBeenCalled()
   })
 
+  it('ups-host role with pveConfig: stops guests before OS shutdown', async () => {
+    const pveConfig = { url: 'https://pve:8006', tokenId: 'x', tokenSecret: 'y', node: 'pve' }
+    await runShutdownSequence({
+      role: 'ups-host',
+      cfg: { machineKey: 'mk', pveConfig, pbsConfig: null },
+      send: (m) => sent.push(m),
+    })
+
+    expect(proxmox.enableNodeMaintenance).toHaveBeenCalledWith(pveConfig)
+    expect(proxmox.stopAllGuests).toHaveBeenCalledWith(pveConfig, expect.any(Function))
+    expect(executeShutdown).toHaveBeenCalledWith(0)
+  })
+
   it('pve-node role: stops guests before OS shutdown', async () => {
     const pveConfig = { url: 'https://pve:8006', tokenId: 'x', tokenSecret: 'y', node: 'pve' }
     await runShutdownSequence({

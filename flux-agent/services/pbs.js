@@ -15,7 +15,7 @@ function apiRequest(pbsConfig, method, path, body = null) {
       path: u.pathname + (u.search || ''),
       method,
       headers: {
-        Authorization: `PVEAPIToken=${pbsConfig.tokenId}=${pbsConfig.tokenSecret}`,
+        Authorization: `PBSAPIToken=${pbsConfig.tokenId}:${pbsConfig.tokenSecret}`,
         'Content-Type': 'application/json',
       },
       rejectUnauthorized: false,

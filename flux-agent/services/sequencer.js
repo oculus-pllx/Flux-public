@@ -24,8 +24,8 @@ async function runShutdownSequence({ role, cfg, send, shutdown = null }) {
   }
 
   try {
-    // pve-node and 'both': stop VMs/CTs before OS shutdown
-    if ((role === 'pve-node' || role === 'both') && cfg.pveConfig) {
+    // Proxmox-capable roles stop VMs/CTs before OS shutdown.
+    if ((role === 'pve-node' || role === 'ups-host' || role === 'both') && cfg.pveConfig) {
       const proxmox = require('./proxmox')
       await proxmox.enableNodeMaintenance(cfg.pveConfig)
       step('enabling HA maintenance', 1, 1)

@@ -31,22 +31,24 @@ The HA/PBS controls are code-complete but configuration-dependent. They only run
 - PVE guest shutdown on a node requires that node's agent to have valid `pveConfig`.
 - PBS job abort requires the PBS agent to have valid `pbsConfig`.
 
-Do not assume the live `.135` instance is fully HA/PBS-ready until those configs are verified in the database/UI and pushed to the agents.
+Live `.135` now has PVE/PBS API configs saved and pushed to agents. Read-only
+API verification passes from the agents themselves. Destructive execution of HA
+freeze, guest shutdown, and PBS job abort is still intentionally untested.
 
 ## Next Concrete Tasks
 
 - [x] On `.135`, verify all PVE node rows have the correct role, `upsGroupId`, `clusterId`, `shutdownOrder`, and `shutdownDelay`.
-- [ ] On `.135`, add or verify `pveConfig` for at least one reachable PVE node in each Proxmox cluster.
-- [ ] On `.135`, add or verify `pveConfig` for every PVE node that should stop its own VMs/CTs before host shutdown.
-- [ ] On `.135`, add or verify `pbsConfig` on the PBS machine so running backup jobs are aborted before shutdown.
-- [ ] Push updated machine configs to connected agents after editing `pveConfig`, `pbsConfig`, or `nutConfig`.
+- [x] On `.135`, add or verify `pveConfig` for at least one reachable PVE node in each Proxmox cluster.
+- [x] On `.135`, add or verify `pveConfig` for every PVE node that should stop its own VMs/CTs before host shutdown.
+- [x] On `.135`, add or verify `pbsConfig` on the PBS machine so running backup jobs are aborted before shutdown.
+- [x] Push updated machine configs to connected agents after editing `pveConfig`, `pbsConfig`, or `nutConfig`.
 - [x] Push updated cluster metadata to connected PVE agents after editing `clusterId`.
 - [x] Run a non-destructive dry run or controlled simulation that proves the shutdown sequence emits the expected steps without relying on a real low-battery event.
 - [x] Confirm the UPS host still reports `apc2200` over NUT and remains assigned to the UPS as `ups-host`.
 - [x] Confirm UPS controls still work: beeper enable/disable, mute, and any available APC instant commands supported by NUT for this model.
 - [x] Check whether load and input voltage fields are absent from the APC/NUT data or just not surfaced in the UI.
 - [x] Rename public source references from `Flux-public` to `Flux-Controller`: install URLs, README clone commands, release URLs, updater metadata, and hardcoded repo references.
-- [ ] Rename/create the actual GitHub public repository as `oculus-pllx/Flux-Controller` and point the public checkout remote there.
+- [x] Rename/create the actual GitHub public repository as `oculus-pllx/Flux-Controller` and point the public checkout remote there.
 - [ ] Update or close stale unchecked process boxes in older plan docs after confirming commits/releases are already done.
 
 ## Docs Status
