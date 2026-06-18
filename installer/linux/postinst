@@ -11,10 +11,20 @@ chmod 750 /var/lib/flux
 
 mkdir -p /etc/flux
 
+if [ ! -f /etc/flux/.env ]; then
+    if [ -f /etc/flux/flux.env ]; then
+        cp /etc/flux/flux.env /etc/flux/.env
+    else
+        JWT_SECRET=$(openssl rand -hex 32)
+        sed "s/JWT_SECRET=PLACEHOLDER/JWT_SECRET=${JWT_SECRET}/" \
+            /opt/flux/installer/linux/flux.env.template > /etc/flux/.env
+    fi
+    chmod 640 /etc/flux/.env
+    chown root:flux /etc/flux/.env
+fi
+
 if [ ! -f /etc/flux/flux.env ]; then
-    JWT_SECRET=$(openssl rand -hex 32)
-    sed "s/JWT_SECRET=PLACEHOLDER/JWT_SECRET=${JWT_SECRET}/" \
-        /opt/flux/installer/linux/flux.env.template > /etc/flux/flux.env
+    cp /etc/flux/.env /etc/flux/flux.env
     chmod 640 /etc/flux/flux.env
     chown root:flux /etc/flux/flux.env
 fi
