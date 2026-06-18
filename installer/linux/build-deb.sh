@@ -19,7 +19,7 @@ echo "Installing production dependencies..."
 cd backend && npm ci --omit=dev --silent && cd ..
 
 cp -r backend/config backend/middleware backend/models \
-      backend/routes backend/services backend/server.js \
+      backend/routes backend/services backend/utils backend/server.js \
       backend/node_modules backend/package.json \
       "$BUILD_DIR/opt/flux/backend/"
 
