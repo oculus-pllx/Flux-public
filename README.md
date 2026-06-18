@@ -120,7 +120,7 @@ Click **+ Enroll Machine** → SSH tab. Flux SSHs in, runs the installer non-int
 
 Once machines are enrolled and assigned to a UPS group:
 
-1. Click **⚡ Auto-order** in the UPS group header — automatically assigns shutdown order and delay by role: `controlled → pve-node → pbs → ups-host`, 30s apart.
+1. Click **⚡ Auto-order** in the UPS group header — automatically assigns shutdown order and delay by role: `controlled → pbs → pve-node → ups-host`, 30s apart.
 2. Or edit manually: click any machine → **Config tab** → set `shutdownOrder` and `shutdownDelay`.
 
 Each machine row shows `#1 · 0s` — position and delay at a glance.
