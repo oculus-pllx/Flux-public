@@ -105,3 +105,42 @@ describe('sshService.installNutServer', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('sshService.configureNutSource', () => {
+  it('writes an APC SNMP source, backs up config, restarts NUT, and verifies with upsc', async () => {
+    mockExecResponses = ['switching...\nFLUX_NUT_SOURCE_OK\n']
+    const output = await sshService.configureNutSource(machine, {
+      sourceType: 'snmp',
+      upsName: 'apc2200',
+      snmpHost: '10.250.0.2',
+      snmpVersion: 'v1',
+      community: 'public',
+      mibs: 'apcc',
+    })
+
+    expect(output).toContain('FLUX_NUT_SOURCE_OK')
+    const script = mockExecCommands[0]
+    expect(script).toContain('flux-source-backup-')
+    expect(script).toContain('[apc2200]')
+    expect(script).toContain('driver = snmp-ups')
+    expect(script).toContain('port = 10.250.0.2')
+    expect(script).toContain('community = public')
+    expect(script).toContain('snmp_version = v1')
+    expect(script).toContain('mibs = apcc')
+    expect(script).toContain('systemctl restart nut-server')
+    expect(script).toContain('upsc "$UPS_NAME"')
+  })
+
+  it('throws when source switch verification does not produce the success sentinel', async () => {
+    mockExecResponses = ['FLUX_NUT_SOURCE_ROLLBACK\nupsc failed\n']
+
+    await expect(
+      sshService.configureNutSource(machine, {
+        sourceType: 'usb',
+        upsName: 'apc2200',
+        vendorid: '051D',
+        productid: '0003',
+      })
+    ).rejects.toThrow('NUT source switch did not complete')
+  })
+})

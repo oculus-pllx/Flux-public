@@ -9,6 +9,7 @@ const {
   assertNoControl,
   assertNutSecret,
   assertNutToken,
+  badRequest,
 } = require('../utils/validation')
 
 router.use(authenticate)
@@ -190,6 +191,78 @@ router.post('/:id/configure-nut', requireRole('admin', 'operator'), async (req, 
     await device.update(update)
     pollingService.scheduleDevice(device)
     res.json({ device: sanitizeDevice(device), discovered, nutUsername, configured: true })
+  } catch (err) { next(err) }
+})
+
+function sourcePayload(body, device) {
+  const sourceType = body.sourceType || 'usb'
+  if (!['usb', 'snmp'].includes(sourceType)) throw badRequest('NUT source type must be usb or snmp')
+  const source = {
+    sourceType,
+    upsName: body.upsName || device.upsName,
+  }
+  assertNutToken(source.upsName, 'UPS name')
+
+  if (sourceType === 'usb') {
+    source.port = body.sourcePort || body.usbPort || 'auto'
+    assertNutToken(source.port, 'USB port')
+    if (body.vendorid) {
+      assertNutToken(body.vendorid, 'USB vendor ID')
+      source.vendorid = body.vendorid
+    }
+    if (body.productid) {
+      assertNutToken(body.productid, 'USB product ID')
+      source.productid = body.productid
+    }
+    return source
+  }
+
+  source.snmpHost = body.snmpHost
+  assertHost(source.snmpHost, 'SNMP host')
+  source.snmpVersion = body.snmpVersion || 'v1'
+  if (!['v1', 'v2c'].includes(source.snmpVersion)) throw badRequest('SNMP version must be v1 or v2c')
+  source.community = body.community || 'public'
+  assertNutSecret(source.community, 'SNMP community')
+  source.mibs = body.mibs || 'apcc'
+  assertNutToken(source.mibs, 'SNMP MIB')
+  return source
+}
+
+router.post('/:id/source', requireRole('admin', 'operator'), async (req, res, next) => {
+  try {
+    const device = await Device.findByPk(req.params.id)
+    if (!device) return res.status(404).json({ error: 'Not found' })
+
+    const machine = sshMachineFromBody(req.body)
+    const source = sourcePayload(req.body, device)
+    const sshService = require('../services/sshService')
+    await sshService.configureNutSource(machine, source)
+
+    const discovered = await discoverNut(machine)
+    const upsName = discovered.upsNames.includes(source.upsName)
+      ? source.upsName
+      : (discovered.upsNames[0] || source.upsName)
+    const update = {
+      host: discovered.nutHost,
+      port: discovered.nutPort,
+      upsName,
+    }
+
+    try {
+      const nutService = require('../services/nutService')
+      update.lastStatus = await nutService.pollDevice(
+        update.host,
+        update.port,
+        update.upsName,
+        device.nutUsername,
+        device.nutPassword
+      )
+      update.lastSeen = new Date()
+    } catch {}
+
+    await device.update(update)
+    pollingService.scheduleDevice(device)
+    res.json({ configured: true, sourceType: source.sourceType, device: sanitizeDevice(device), discovered })
   } catch (err) { next(err) }
 })
 

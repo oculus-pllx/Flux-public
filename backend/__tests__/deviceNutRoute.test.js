@@ -4,6 +4,7 @@ process.env.DB_PATH = ':memory:'
 jest.mock('../services/sshService', () => ({
   runCommand: jest.fn(),
   installNutServer: jest.fn(),
+  configureNutSource: jest.fn(),
 }))
 jest.mock('../services/pollingService', () => ({
   scheduleDevice: jest.fn(),
@@ -156,5 +157,84 @@ describe('POST /api/devices/:id/configure-nut', () => {
     expect(device.nutUsername).toBe('fluxctl')
     expect(device.nutPassword).toBe('secret123')
     expect(device.lastStatus).toEqual({ 'ups.status': 'OL', 'ups.beeper.status': 'disabled' })
+  })
+})
+
+describe('POST /api/devices/:id/source', () => {
+  it('switches the NUT source without replacing the existing UPS device', async () => {
+    const device = await Device.create({
+      name: 'APC 2200',
+      host: '10.11.200.23',
+      port: 3493,
+      upsName: 'apc2200',
+      pollInterval: 30,
+      nutUsername: 'fluxmon',
+      nutPassword: 'saved-secret',
+    })
+    sshService.configureNutSource.mockResolvedValue('FLUX_NUT_SOURCE_OK')
+    nutService.pollDevice.mockResolvedValue({ 'ups.status': 'OL', 'battery.runtime': '1200' })
+    mockSsh({
+      upsNames: 'apc2200\n',
+      upsdConf: 'LISTEN 0.0.0.0 3493\n',
+      upsdUsers: '[fluxmon]\n  password = saved-secret\n  upsmon primary\n  actions = SET\n  instcmds = ALL\n',
+    })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/source`)
+      .set(auth)
+      .send({
+        ...sshBody,
+        sourceType: 'snmp',
+        upsName: 'apc2200',
+        snmpHost: '10.250.0.2',
+        snmpVersion: 'v1',
+        community: 'public',
+        mibs: 'apcc',
+      })
+
+    expect(res.status).toBe(200)
+    expect(sshService.configureNutSource).toHaveBeenCalledWith(
+      expect.objectContaining({ host: sshBody.host }),
+      {
+        sourceType: 'snmp',
+        upsName: 'apc2200',
+        snmpHost: '10.250.0.2',
+        snmpVersion: 'v1',
+        community: 'public',
+        mibs: 'apcc',
+      }
+    )
+    expect(nutService.pollDevice).toHaveBeenCalledWith('192.168.0.100', 3493, 'apc2200', 'fluxmon', 'saved-secret')
+    expect(res.body.configured).toBe(true)
+    expect(res.body.sourceType).toBe('snmp')
+    expect(res.body.device.id).toBe(device.id)
+    expect(res.body.device.upsName).toBe('apc2200')
+    expect(res.body.device.host).toBe('192.168.0.100')
+    expect(res.body.device.hasNutCredentials).toBe(true)
+    expect(res.body.device.nutPassword).toBeUndefined()
+
+    await device.reload()
+    expect(device.id).toBe(res.body.device.id)
+    expect(device.upsName).toBe('apc2200')
+    expect(device.nutPassword).toBe('saved-secret')
+    expect(device.lastStatus).toEqual({ 'ups.status': 'OL', 'battery.runtime': '1200' })
+  })
+
+  it('rejects invalid source types', async () => {
+    const device = await Device.create({
+      name: 'APC 2200',
+      host: '10.11.200.23',
+      port: 3493,
+      upsName: 'apc2200',
+      pollInterval: 30,
+    })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/source`)
+      .set(auth)
+      .send({ ...sshBody, sourceType: 'telnet' })
+
+    expect(res.status).toBe(400)
+    expect(sshService.configureNutSource).not.toHaveBeenCalled()
   })
 })

@@ -66,10 +66,23 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
     nutUsername: device?.nutUsername || 'fluxmon',
     nutPassword: '',
   })
+  const [source, setSource] = useState({
+    sourceType: 'usb',
+    upsName: device?.upsName || 'ups',
+    usbPort: 'auto',
+    vendorid: '',
+    productid: '',
+    snmpHost: '',
+    snmpVersion: 'v1',
+    community: 'public',
+    mibs: 'apcc',
+  })
   const [busy, setBusy] = useState(false)
   const [repairBusy, setRepairBusy] = useState(false)
+  const [sourceBusy, setSourceBusy] = useState(false)
   const [error, setError] = useState('')
   const [repairMsg, setRepairMsg] = useState('')
+  const [sourceMsg, setSourceMsg] = useState('')
 
   const updateForm = key => e => {
     const value = key === 'active' ? e.target.checked : e.target.value
@@ -79,6 +92,11 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
   const updateSsh = key => e => {
     const value = e.target.value
     setSsh(p => ({ ...p, [key]: value }))
+  }
+
+  const updateSource = key => e => {
+    const value = e.target.value
+    setSource(p => ({ ...p, [key]: value }))
   }
 
   function sshPayload() {
@@ -148,6 +166,44 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
     }
   }
 
+  async function applySource() {
+    setSourceBusy(true)
+    setError('')
+    setSourceMsg('')
+    try {
+      const payload = {
+        ...sshPayload(),
+        sourceType: source.sourceType,
+        upsName: source.upsName || form.upsName || 'ups',
+      }
+      if (source.sourceType === 'snmp') {
+        payload.snmpHost = source.snmpHost
+        payload.snmpVersion = source.snmpVersion
+        payload.community = source.community
+        payload.mibs = source.mibs
+      } else {
+        payload.usbPort = source.usbPort || 'auto'
+        if (source.vendorid) payload.vendorid = source.vendorid
+        if (source.productid) payload.productid = source.productid
+      }
+      const { data } = await axios.post(`/api/devices/${device.id}/source`, payload, { headers })
+      setSourceMsg(`UPS input source changed to ${source.sourceType === 'snmp' ? 'APC network card' : 'USB HID'}.`)
+      onSaved(data.device)
+      setForm(p => ({
+        ...p,
+        host: data.device.host,
+        port: String(data.device.port),
+        upsName: data.device.upsName,
+        nutPassword: '',
+      }))
+      setSource(p => ({ ...p, upsName: data.device.upsName }))
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'NUT source switch failed')
+    } finally {
+      setSourceBusy(false)
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.68)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'var(--flux-panel)', border: '1px solid var(--flux-border)', borderRadius: 10, width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 20 }}>
@@ -178,11 +234,11 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
           {error && <p style={{ color: 'var(--flux-critical)', fontSize: 12, margin: 0 }}>{error}</p>}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button type="button" onClick={onClose} disabled={busy || repairBusy}
+            <button type="button" onClick={onClose} disabled={busy || repairBusy || sourceBusy}
               style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)', borderRadius: 7, padding: '8px 14px', cursor: 'pointer' }}>
               Cancel
             </button>
-            <button type="submit" disabled={busy || repairBusy}
+            <button type="submit" disabled={busy || repairBusy || sourceBusy}
               style={{ background: 'var(--flux-accent)', border: '1px solid var(--flux-accent)', color: '#fff', borderRadius: 7, padding: '8px 14px', cursor: 'pointer', opacity: busy ? 0.65 : 1 }}>
               {busy ? 'Saving...' : 'Save UPS'}
             </button>
@@ -228,9 +284,55 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
             <TextInput label="New NUT Password" type="password" value={ssh.nutPassword} onChange={updateSsh('nutPassword')} placeholder="leave blank to generate" />
             {repairMsg && <p style={{ color: 'var(--flux-healthy)', fontSize: 12, margin: 0 }}>{repairMsg}</p>}
             <div>
-              <button type="button" onClick={repair} disabled={busy || repairBusy || !ssh.host}
+              <button type="button" onClick={repair} disabled={busy || repairBusy || sourceBusy || !ssh.host}
                 style={{ background: 'none', border: '1px solid var(--flux-accent)', color: 'var(--flux-accent)', borderRadius: 7, padding: '8px 14px', cursor: repairBusy ? 'not-allowed' : 'pointer', opacity: repairBusy || !ssh.host ? 0.6 : 1 }}>
                 {repairBusy ? 'Configuring...' : 'Configure Full-Control NUT User'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--flux-border)', marginTop: 18, paddingTop: 16 }}>
+          <h3 style={{ color: 'var(--flux-text)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Change UPS Input Source</h3>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '.8fr 1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Source Type</label>
+                <select value={source.sourceType} onChange={updateSource('sourceType')} style={{ ...inputStyle, cursor: 'pointer' }}>
+                  <option value="usb">USB HID</option>
+                  <option value="snmp">APC Network Card / SNMP</option>
+                </select>
+              </div>
+              <TextInput label="UPS Name to Preserve" value={source.upsName} onChange={updateSource('upsName')} />
+              {source.sourceType === 'snmp' ? (
+                <TextInput label="Network Card IP" value={source.snmpHost} onChange={updateSource('snmpHost')} placeholder="10.250.0.2" />
+              ) : (
+                <TextInput label="USB Port" value={source.usbPort} onChange={updateSource('usbPort')} placeholder="auto" />
+              )}
+            </div>
+            {source.sourceType === 'snmp' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '.7fr 1fr .7fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>SNMP Version</label>
+                  <select value={source.snmpVersion} onChange={updateSource('snmpVersion')} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="v1">v1</option>
+                    <option value="v2c">v2c</option>
+                  </select>
+                </div>
+                <TextInput label="SNMP Community" type="password" value={source.community} onChange={updateSource('community')} />
+                <TextInput label="MIB" value={source.mibs} onChange={updateSource('mibs')} placeholder="apcc" />
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <TextInput label="USB Vendor ID" value={source.vendorid} onChange={updateSource('vendorid')} placeholder="051D" />
+                <TextInput label="USB Product ID" value={source.productid} onChange={updateSource('productid')} placeholder="0003" />
+              </div>
+            )}
+            {sourceMsg && <p style={{ color: 'var(--flux-healthy)', fontSize: 12, margin: 0 }}>{sourceMsg}</p>}
+            <div>
+              <button type="button" onClick={applySource} disabled={busy || repairBusy || sourceBusy || !ssh.host || (source.sourceType === 'snmp' && !source.snmpHost)}
+                style={{ background: 'none', border: '1px solid var(--flux-accent)', color: 'var(--flux-accent)', borderRadius: 7, padding: '8px 14px', cursor: sourceBusy ? 'not-allowed' : 'pointer', opacity: sourceBusy || !ssh.host || (source.sourceType === 'snmp' && !source.snmpHost) ? 0.6 : 1 }}>
+                {sourceBusy ? 'Switching...' : 'Apply Input Source'}
               </button>
             </div>
           </div>

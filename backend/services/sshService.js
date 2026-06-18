@@ -253,6 +253,144 @@ echo "FLUX_NUT_SERVER_OK"`
   return output
 }
 
+function nutSourceConfig(source) {
+  const sourceType = source.sourceType || 'usb'
+  assertNutToken(source.upsName, 'UPS name')
+
+  if (sourceType === 'usb') {
+    const port = source.port || 'auto'
+    assertNutToken(port, 'USB port')
+    const lines = [
+      `[${source.upsName}]`,
+      '  driver = usbhid-ups',
+      `  port = ${port}`,
+    ]
+    if (source.vendorid) {
+      assertNutToken(source.vendorid, 'USB vendor ID')
+      lines.push(`  vendorid = ${source.vendorid}`)
+    }
+    if (source.productid) {
+      assertNutToken(source.productid, 'USB product ID')
+      lines.push(`  productid = ${source.productid}`)
+    }
+    lines.push('  desc = "Flux managed USB HID UPS"')
+    return { sourceType, config: `${lines.join('\n')}\n` }
+  }
+
+  if (sourceType === 'snmp') {
+    assertHost(source.snmpHost, 'SNMP host')
+    const snmpVersion = source.snmpVersion || 'v1'
+    if (!['v1', 'v2c'].includes(snmpVersion)) throw new Error('SNMP version must be v1 or v2c')
+    const community = source.community || 'public'
+    assertNutSecret(community, 'SNMP community')
+    const mibs = source.mibs || 'apcc'
+    assertNutToken(mibs, 'SNMP MIB')
+    const lines = [
+      `[${source.upsName}]`,
+      '  driver = snmp-ups',
+      `  port = ${source.snmpHost}`,
+      `  community = ${community}`,
+      `  snmp_version = ${snmpVersion}`,
+      `  mibs = ${mibs}`,
+      '  desc = "Flux managed APC network UPS"',
+    ]
+    return { sourceType, config: `${lines.join('\n')}\n` }
+  }
+
+  throw new Error('NUT source type must be usb or snmp')
+}
+
+async function configureNutSource(machine, source) {
+  const { sourceType, config } = nutSourceConfig(source)
+  const upsName = shellQuote(source.upsName)
+
+  const script = `set -e
+if ! command -v upsd >/dev/null 2>&1 && ! command -v upsdrvctl >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nut
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y nut
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y nut
+  elif command -v pacman >/dev/null 2>&1; then
+    pacman -S --noconfirm network-ups-tools
+  elif command -v apk >/dev/null 2>&1; then
+    apk add nut
+  else
+    echo "ERROR: unsupported package manager" >&2; exit 1
+  fi
+fi
+UPS_NAME=${upsName}
+CONF_DIR=/etc/nut
+[ -f /etc/ups/ups.conf ] && CONF_DIR=/etc/ups
+mkdir -p "$CONF_DIR"
+BACKUP_DIR="$CONF_DIR/flux-source-backup-$(date +%Y%m%d%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+for f in ups.conf upsd.conf nut.conf upsd.users; do
+  [ -f "$CONF_DIR/$f" ] && cp -p "$CONF_DIR/$f" "$BACKUP_DIR/$f"
+done
+touch "$CONF_DIR/ups.conf" "$CONF_DIR/upsd.conf" "$CONF_DIR/nut.conf"
+awk -v name="$UPS_NAME" '
+  $0 == "[" name "]" { skip = 1; next }
+  /^\\[/ { skip = 0 }
+  !skip { print }
+' "$CONF_DIR/ups.conf" > "$CONF_DIR/ups.conf.flux"
+cat > "$CONF_DIR/ups.conf.new" <<'FLUX_UPS_STANZA'
+${config}FLUX_UPS_STANZA
+cat "$CONF_DIR/ups.conf.new" >> "$CONF_DIR/ups.conf.flux"
+mv "$CONF_DIR/ups.conf.flux" "$CONF_DIR/ups.conf"
+rm -f "$CONF_DIR/ups.conf.new"
+if grep -q '^MODE=' "$CONF_DIR/nut.conf" 2>/dev/null; then
+  sed -i 's/^MODE=.*/MODE=netserver/' "$CONF_DIR/nut.conf"
+else
+  echo 'MODE=netserver' >> "$CONF_DIR/nut.conf"
+fi
+grep -qE '^LISTEN[[:space:]]+' "$CONF_DIR/upsd.conf" 2>/dev/null || printf 'LISTEN 0.0.0.0 3493\\n' >> "$CONF_DIR/upsd.conf"
+restart_nut() {
+  upsdrvctl stop "$UPS_NAME" >/dev/null 2>&1 || true
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl list-unit-files "nut-driver@$UPS_NAME.service" >/dev/null 2>&1; then
+    systemctl enable "nut-driver@$UPS_NAME.service" >/dev/null 2>&1 || true
+    systemctl restart "nut-driver@$UPS_NAME.service" >/dev/null 2>&1 || upsdrvctl start "$UPS_NAME" >/dev/null 2>&1 || true
+  else
+    upsdrvctl start "$UPS_NAME" >/dev/null 2>&1 || true
+  fi
+  if systemctl list-unit-files nut-server.service >/dev/null 2>&1; then
+    systemctl enable nut-server >/dev/null 2>&1 || true
+    systemctl restart nut-server
+  elif systemctl list-unit-files nut.service >/dev/null 2>&1; then
+    systemctl enable nut >/dev/null 2>&1 || true
+    systemctl restart nut
+  else
+    upsd 2>/dev/null || true
+  fi
+}
+rollback_nut() {
+  for f in ups.conf upsd.conf nut.conf upsd.users; do
+    [ -f "$BACKUP_DIR/$f" ] && cp -p "$BACKUP_DIR/$f" "$CONF_DIR/$f"
+  done
+  restart_nut >/dev/null 2>&1 || true
+}
+restart_nut
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if upsc "$UPS_NAME" >/dev/null 2>&1; then
+    echo "FLUX_NUT_SOURCE_OK"
+    exit 0
+  fi
+  sleep 1
+done
+rollback_nut
+echo "FLUX_NUT_SOURCE_ROLLBACK"
+exit 1`
+
+  const output = await runCommand(machine, script)
+  if (!output.includes('FLUX_NUT_SOURCE_OK')) {
+    throw new Error(`NUT source switch did not complete. Output: ${output.slice(-1000)}`)
+  }
+  return output
+}
+
 async function getNutMonitorStatus(machine) {
   const script = `if systemctl is-active --quiet nut-monitor 2>/dev/null; then
   echo "running:nut-monitor"
@@ -333,4 +471,4 @@ async function installAgent(machine, { fluxUrl, token, role }, { onOutput } = {}
   })
 }
 
-module.exports = { shutdown, testConnection, runCommand, deployNutMonitor, installNutServer, getNutMonitorStatus, installAgent, readKeyFileSafe }
+module.exports = { shutdown, testConnection, runCommand, deployNutMonitor, installNutServer, configureNutSource, getNutMonitorStatus, installAgent, readKeyFileSafe }
