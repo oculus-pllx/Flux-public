@@ -10,6 +10,10 @@ function githubRepo() {
   return process.env.FLUX_GITHUB_REPO || 'oculus-pllx/Flux-public'
 }
 
+function hasGithubToken() {
+  return Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN)
+}
+
 function manualCommand(repo = githubRepo()) {
   const branch = process.env.FLUX_GITHUB_BRANCH || 'main'
   return `tmp=$(mktemp) && curl -fsSL https://raw.githubusercontent.com/${repo}/${branch}/install.sh -o "$tmp" && printf '\\n' | sudo bash "$tmp"; rm -f "$tmp"`
@@ -38,13 +42,20 @@ async function getStatus() {
   const mode = detectMode()
   let release = null
   let error = null
+  let updateCheckUnavailable = false
   if (releaseCache && Date.now() - releaseCache.at < CACHE_TTL_MS) {
     release = releaseCache.release
   } else {
     try {
       release = await getLatestRelease(githubRepo())
       releaseCache = { at: Date.now(), release }
-    } catch (e) { error = e.message }
+    } catch (e) {
+      if (e.statusCode === 404 && !hasGithubToken()) {
+        updateCheckUnavailable = true
+      } else {
+        error = e.message
+      }
+    }
   }
   return {
     currentVersion:  CURRENT_VERSION,
@@ -55,6 +66,7 @@ async function getStatus() {
     mode,
     repo:            githubRepo(),
     manualCommand:   manualCommand(),
+    ...(updateCheckUnavailable ? { updateCheckUnavailable: true } : {}),
     ...(error ? { error } : {}),
   }
 }

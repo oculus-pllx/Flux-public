@@ -17,6 +17,8 @@ beforeEach(() => {
   delete process.env.FLUX_UPDATE_MODE
   delete process.env.FLUX_GITHUB_REPO
   delete process.env.UPDATER_TOKEN
+  delete process.env.GITHUB_TOKEN
+  delete process.env.GH_TOKEN
 })
 
 afterEach(() => {
@@ -72,6 +74,16 @@ describe('getStatus', () => {
     const s = await svc().getStatus()
     expect(s.updateAvailable).toBe(false)
     expect(s.error).toBe('boom')
+  })
+
+  it('does not expose private repo 404s as update check errors when no GitHub token is configured', async () => {
+    const err = new Error('GitHub API returned 404')
+    err.statusCode = 404
+    gh().getLatestRelease.mockRejectedValue(err)
+    const s = await svc().getStatus()
+    expect(s.updateAvailable).toBe(false)
+    expect(s.error).toBeUndefined()
+    expect(s.updateCheckUnavailable).toBe(true)
   })
 
   it('uses FLUX_GITHUB_REPO for public repo update checks and manual command hints', async () => {
