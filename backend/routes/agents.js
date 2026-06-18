@@ -1,5 +1,6 @@
 const router = require('express').Router()
 const crypto = require('crypto')
+const { Op } = require('sequelize')
 const { authenticate, requireRole } = require('../middleware/auth')
 const AgentMachine = require('../models/AgentMachine')
 const AgentMachineEvent = require('../models/AgentMachineEvent')
@@ -37,11 +38,24 @@ router.post('/install-via-ssh', requireRole('admin', 'operator'), async (req, re
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
   let machine = null
   try {
-	    machine = await AgentMachine.create({
-	      hostname: host, enrollmentToken: token, enrollmentExpiry: expiresAt,
-	      state: 'pending', upsGroupId: upsGroupId || null, role: role || 'controlled',
-	      nutConfig: nutConfig || null,
-	    })
+    machine = await findReusableInstallMachine(host)
+    const installFields = {
+      hostname: host,
+      machineKey: null,
+      enrollmentToken: token,
+      enrollmentExpiry: expiresAt,
+      state: 'pending',
+      stateDetail: null,
+      upsGroupId: upsGroupId || null,
+      role: role || 'controlled',
+      nutConfig: nutConfig || null,
+      installLog: null,
+    }
+    if (machine) {
+      await machine.update(installFields)
+    } else {
+      machine = await AgentMachine.create(installFields)
+    }
 
     const jobId   = installJobService.createJob(machine.id)
     const fluxUrl = `${req.protocol}://${req.get('host')}`
@@ -70,6 +84,17 @@ router.post('/install-via-ssh', requireRole('admin', 'operator'), async (req, re
     next(err)
   }
 })
+
+function findReusableInstallMachine(host) {
+  return AgentMachine.findOne({
+    where: {
+      hostname: host,
+      lastSeen: null,
+      state: { [Op.in]: ['offline', 'pending'] },
+    },
+    order: [['updatedAt', 'DESC']],
+  })
+}
 
 // Poll install job status — returns accumulated log + done flag
 router.get('/install-jobs/:jobId', requireRole('admin', 'operator'), (req, res) => {

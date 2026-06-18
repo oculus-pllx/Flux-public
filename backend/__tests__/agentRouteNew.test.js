@@ -116,6 +116,43 @@ describe('POST /api/agents/install-via-ssh', () => {
       .send({ sshAuthType: 'password', sshPassword: 'x' })
     expect(res.status).toBe(400)
   })
+
+  it('reuses a stale never-seen machine for the same SSH host instead of creating a duplicate', async () => {
+    const stale = await AgentMachine.create({
+      machineKey: 'old-key',
+      hostname: '10.11.200.23',
+      role: 'ups-host',
+      state: 'offline',
+      lastSeen: null,
+      upsGroupId: 3,
+    })
+
+    const res = await request(app)
+      .post('/api/agents/install-via-ssh')
+      .set(auth)
+      .send({
+        host: '10.11.200.23',
+        sshPort: 22,
+        sshUser: 'root',
+        sshAuthType: 'password',
+        sshPassword: 'secret',
+        role: 'pve-node',
+        upsGroupId: 3,
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body.machineId).toBe(stale.id)
+    const rows = await AgentMachine.findAll({ where: { hostname: '10.11.200.23' } })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      id: stale.id,
+      role: 'pve-node',
+      state: 'pending',
+      upsGroupId: 3,
+    })
+    expect(rows[0].machineKey).toBeNull()
+    expect(rows[0].enrollmentToken).toHaveLength(64)
+  })
 })
 
 describe('GET /api/agents/install-jobs/:jobId', () => {
