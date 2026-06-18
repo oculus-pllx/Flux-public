@@ -23,13 +23,23 @@ function ServerUpdateCard({ headers }) {
   const [status, setStatus] = useState(null)
   const [job, setJob]       = useState(null)   // { state, log }
   const [busy, setBusy]     = useState(false)
+  const [checking, setChecking] = useState(false)
   const [error, setError]   = useState(null)
 
-  useEffect(() => {
-    axios.get('/api/system/update', { headers })
-      .then(r => setStatus(r.data))
-      .catch(e => setError(e.response?.data?.error || e.message))
-  }, [])
+  async function checkUpdates() {
+    setChecking(true)
+    setError(null)
+    try {
+      const { data } = await axios.get('/api/system/update', { headers })
+      setStatus(data)
+    } catch (e) {
+      setError(e.response?.data?.error || e.message)
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  useEffect(() => { checkUpdates() }, [])
 
   useEffect(() => {
     if (!busy) return
@@ -59,6 +69,8 @@ function ServerUpdateCard({ headers }) {
   const jobColor = job?.state === 'failed' ? 'var(--flux-critical)'
                  : job?.state === 'success' ? 'var(--flux-healthy)'
                  : 'var(--flux-warning)'
+
+  const canOneClick = status && status.mode !== 'manual'
 
   return (
     <div style={{ ...cardPanel, marginBottom: 24 }}>
@@ -90,27 +102,51 @@ function ServerUpdateCard({ headers }) {
                 Update check failed: {status.error}
               </p>
             )}
+            <p className="font-mono text-xs mt-1" style={{ color: 'var(--flux-dim)' }}>
+              mode: {status.mode || 'unknown'} · repo: {status.repo || 'default'}
+            </p>
           </div>
 
-          {status.updateAvailable && status.mode !== 'manual' && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={startUpdate}
-              disabled={busy}
-              className="font-display font-semibold text-sm px-5 py-2 rounded-lg disabled:opacity-40"
-              style={{ background: 'var(--flux-accent)', color: '#fff' }}
+              onClick={checkUpdates}
+              disabled={checking || busy}
+              className="font-display font-semibold text-sm px-4 py-2 rounded-lg disabled:opacity-40"
+              style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}
             >
-              {busy ? 'Updating…' : '⬆ Update Now'}
+              {checking ? 'Checking...' : 'Check for Updates'}
             </button>
-          )}
+            {canOneClick && (
+              <button
+                onClick={startUpdate}
+                disabled={busy}
+                className="font-display font-semibold text-sm px-5 py-2 rounded-lg disabled:opacity-40"
+                style={{ background: 'var(--flux-accent)', color: '#fff' }}
+                title={status.updateAvailable ? 'Apply the latest release' : 'Manually run the updater for this install'}
+              >
+                {busy ? 'Updating...' : status.updateAvailable ? 'Update Now' : 'Run Manual Update'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {status?.updateAvailable && status.mode === 'manual' && (
+      {status?.mode === 'manual' && (
         <div className="font-mono text-xs rounded-lg p-3 mt-3"
           style={{ background: 'var(--flux-bg)', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}>
           One-click update is not available for this install.<br />
           Docker: run <span style={{ color: 'var(--flux-text)' }}>git pull && docker compose up -d --build</span> in the Flux directory.<br />
           Systemd: run <span style={{ color: 'var(--flux-text)' }}>{status.manualCommand || 'install.sh'}</span> once to enable the updater.
+          {status.manualCommand && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={() => navigator.clipboard.writeText(status.manualCommand).catch(() => {})}
+                className="font-display font-semibold text-xs px-3 py-1.5 rounded"
+                style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)' }}>
+                Copy Systemd Update Command
+              </button>
+            </div>
+          )}
         </div>
       )}
 

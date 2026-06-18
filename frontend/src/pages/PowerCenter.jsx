@@ -76,7 +76,132 @@ function timeAgo(dateStr) {
 
 // ── UPS Group Header ──────────────────────────────────────────────────────────
 
-function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, onEdit }) {
+function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const candidates = allAgents
+    .filter(machine => machine.upsGroupId !== device.id)
+    .sort((a, b) => (a.hostname || '').localeCompare(b.hostname || ''))
+
+  async function assign(machineId) {
+    if (!machineId) return
+    setSaving(true)
+    setError('')
+    try {
+      await axios.put(`/api/agents/${machineId}`, { upsGroupId: device.id }, { headers })
+      setOpen(false)
+      onAssigned()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to assign machine')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (candidates.length === 0) {
+    return (
+      <button
+        disabled
+        title="All enrolled machines are already assigned to this UPS"
+        style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--flux-border)',
+          color: 'var(--flux-dim)',
+          fontSize: 11,
+          padding: '3px 10px',
+          borderRadius: 5,
+          cursor: 'not-allowed',
+        }}>
+        Assign Machine
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          title="Assign an existing enrolled machine to this UPS"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid var(--flux-border)',
+            color: 'var(--flux-muted)',
+            fontSize: 11,
+            padding: '3px 10px',
+            borderRadius: 5,
+            cursor: 'pointer',
+          }}>
+          Assign Machine
+        </button>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <select
+            autoFocus
+            disabled={saving}
+            defaultValue=""
+            onChange={e => assign(e.target.value)}
+            onBlur={() => !saving && setOpen(false)}
+            style={{
+              background: 'var(--flux-panel)',
+              border: '1px solid var(--flux-accent)',
+              color: 'var(--flux-text)',
+              fontSize: 11,
+              padding: '3px 8px',
+              borderRadius: 5,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              fontFamily: 'IBM Plex Mono, monospace',
+              maxWidth: 260,
+            }}>
+            <option value="" disabled>{saving ? 'Assigning...' : 'Select machine'}</option>
+            {candidates.map(machine => (
+              <option key={machine.id} value={machine.id}>
+                {machine.hostname} · {machine.role || 'controlled'}
+                {machine.upsGroupId ? ' · move from another UPS' : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => { setOpen(false); setError('') }}
+            style={{
+              background: 'none',
+              border: '1px solid var(--flux-border)',
+              color: 'var(--flux-muted)',
+              borderRadius: 5,
+              fontSize: 11,
+              padding: '3px 7px',
+              cursor: 'pointer',
+            }}>
+            x
+          </button>
+        </div>
+      )}
+      {error && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: 'calc(100% + 4px)',
+          zIndex: 5,
+          minWidth: 220,
+          background: 'var(--flux-panel)',
+          border: '1px solid var(--flux-critical)',
+          color: 'var(--flux-critical)',
+          fontSize: 11,
+          padding: '6px 8px',
+          borderRadius: 5,
+          fontFamily: 'monospace',
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, onRefresh, onEdit }) {
   const navigate = useNavigate()
   const [mutePhase,   setMutePhase]   = useState('idle')
   const [muteMsg,     setMuteMsg]     = useState('')
@@ -224,6 +349,14 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, onRefresh, on
               }}>
               Edit
             </button>
+          )}
+          {canWrite && (
+            <AssignMachineToUpsButton
+              device={device}
+              allAgents={allAgents}
+              headers={headers}
+              onAssigned={onRefresh}
+            />
           )}
           {canWrite && (
             <button
@@ -939,7 +1072,16 @@ export default function PowerCenter() {
               borderRadius: 12,
               overflow: 'hidden',
             }}>
-              <UpsHeader device={device} canWrite={canWrite} isAdmin={isAdmin} headers={headers} machines={machines} onRefresh={load} onEdit={() => setEditUps(device)} />
+              <UpsHeader
+                device={device}
+                canWrite={canWrite}
+                isAdmin={isAdmin}
+                headers={headers}
+                machines={machines}
+                allAgents={agents}
+                onRefresh={load}
+                onEdit={() => setEditUps(device)}
+              />
 
               <div style={{ background: 'var(--flux-panel)' }}>
                 {machines.length === 0 ? (

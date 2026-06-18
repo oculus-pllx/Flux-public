@@ -61,6 +61,14 @@ describe('POST /api/system/update', () => {
     expect(res.body.started).toBe(true)
   })
 
+  it('202 starts a manual update trigger even when no active UPS exists', async () => {
+    serverUpdateService.applyUpdate.mockResolvedValue({ started: true, mode: 'docker' })
+    const res = await request(app).post('/api/system/update').set(adminAuth)
+    expect(res.status).toBe(202)
+    expect(res.body).toEqual({ started: true, mode: 'docker' })
+    expect(serverUpdateService.applyUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it('passes through err.status from the service (manual mode 400)', async () => {
     serverUpdateService.applyUpdate.mockRejectedValue(Object.assign(new Error('nope'), { status: 400 }))
     const res = await request(app).post('/api/system/update').set(adminAuth)

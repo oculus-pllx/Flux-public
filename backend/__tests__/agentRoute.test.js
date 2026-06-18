@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken')
 const { sequelize } = require('../config/database')
 const AgentMachine = require('../models/AgentMachine')
 const AgentMachineEvent = require('../models/AgentMachineEvent')
+const Device = require('../models/Device')
 
 const app = express()
 app.use(express.json())
@@ -65,6 +66,24 @@ describe('PUT /api/agents/:id', () => {
     expect(res.status).toBe(200)
     expect(res.body.shutdownDelay).toBe(60)
     expect(res.body.updatePolicy).toBe('scheduled')
+  })
+
+  it('assigns an existing control machine to a UPS group', async () => {
+    const ups = await Device.create({ name: 'APC 2200', host: '10.11.200.23', upsName: 'apc2200' })
+    const m = await AgentMachine.create({
+      machineKey: 'control-key',
+      hostname: 'control-host',
+      role: 'controlled',
+      upsGroupId: null,
+    })
+
+    const res = await request(app).put(`/api/agents/${m.id}`).set(auth)
+      .send({ upsGroupId: ups.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.upsGroupId).toBe(ups.id)
+    await m.reload()
+    expect(m.upsGroupId).toBe(ups.id)
   })
 })
 
