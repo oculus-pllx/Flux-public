@@ -246,6 +246,37 @@ describe('agentUpdateService', () => {
       errorSpy.mockRestore()
       infoSpy.mockRestore()
     })
+
+    it('does not log a failed update check error when the release has no agent tarball', async () => {
+      jest.mock('https')
+      jest.mock('../models/AgentMachine')
+      jest.mock('../services/agentHub', () => ({ sendToMachine: jest.fn() }))
+      const https2 = require('https')
+      const mockReq = { on: jest.fn(), end: jest.fn() }
+      https2.request.mockImplementationOnce((opts, cb) => {
+        process.nextTick(() => {
+          const res = {
+            statusCode: 200,
+            on: jest.fn((ev, h) => {
+              if (ev === 'data') h(JSON.stringify({ tag_name: 'v9.9.9', assets: [{ name: 'flux_9.9.9_amd64.deb' }] }))
+              if (ev === 'end') h()
+            }),
+          }
+          cb(res)
+        })
+        return mockReq
+      })
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {})
+
+      const { checkAndNotify } = require('../services/agentUpdateService')
+      await expect(checkAndNotify()).resolves.not.toThrow()
+
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('No flux-agent tarball asset found'))
+      errorSpy.mockRestore()
+      infoSpy.mockRestore()
+    })
   })
 
   describe('triggerUpdate', () => {

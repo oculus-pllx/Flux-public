@@ -43,6 +43,10 @@ async function checkAndNotify() {
       console.info('[update] GitHub release check unavailable for this repo; set GITHUB_TOKEN to enable private repo agent update checks.')
       return
     }
+    if (err.message === 'No flux-agent tarball asset found in release') {
+      console.info('[update] No flux-agent tarball asset found in release; skipping agent update notifications.')
+      return
+    }
     console.error('[update] checkAndNotify failed:', err.message)
   }
 }
