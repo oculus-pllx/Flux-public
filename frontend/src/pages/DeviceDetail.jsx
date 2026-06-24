@@ -28,6 +28,16 @@ const SECTIONS = [
 
 const DANGEROUS_CMDS = ['shutdown', 'load.off', 'turnoff', 'bypass.start']
 
+function sourceHealth(device) {
+  const health = device.nutHealth
+  if (!health || !['degraded', 'error'].includes(health.state)) return null
+  return {
+    state: health.state,
+    message: health.message || 'UPS data source needs attention',
+    color: health.state === 'error' ? 'var(--flux-critical)' : 'var(--flux-warning)',
+  }
+}
+
 // Maps command name → { var, active } for green "currently active" highlight
 const CMD_STATUS = {
   'beeper.disable':    { var: 'ups.beeper.status', active: 'disabled' },
@@ -228,6 +238,7 @@ export default function DeviceDetail() {
   if (!device) return <p className="font-sans text-sm" style={{ color: 'var(--flux-muted)' }}>Loading…</p>
 
   const v = device.lastStatus || {}
+  const health = sourceHealth(device)
 
   const chartData = metrics.map(m => ({
     time:   new Date(m.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -310,6 +321,23 @@ export default function DeviceDetail() {
       {/* ── Overview tab ── */}
       {tab === 'overview' && (
         <>
+          {health && (
+            <div className="rounded-lg p-4 mb-6"
+              style={{ background: `${health.color}12`, border: `1px solid ${health.color}55` }}>
+              <p className="font-display font-semibold text-sm mb-1" style={{ color: health.color }}>
+                UPS data source {health.state}
+              </p>
+              <p className="font-mono text-xs" style={{ color: health.color }}>
+                {health.message}
+              </p>
+              {device.nutHealth?.checkedAt && (
+                <p className="font-mono text-xs mt-2" style={{ color: 'var(--flux-dim)' }}>
+                  Checked {new Date(device.nutHealth.checkedAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+          )}
+
           {Object.keys(v).length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               {PRIORITY.map(({ key, label, suffix, fmt }) => {

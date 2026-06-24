@@ -54,6 +54,18 @@ const UPS_STATE_STYLE = {
   unknown: { color: '#475569', bg: '#0f172a', border: '#1e293b' },
 }
 
+function sourceHealth(device) {
+  const health = device.nutHealth
+  if (!health || !['degraded', 'error'].includes(health.state)) return null
+  return {
+    state: health.state,
+    message: health.message || 'UPS data source needs attention',
+    color: health.state === 'error' ? '#ef4444' : '#f59e0b',
+    bg: health.state === 'error' ? '#200000' : '#110f00',
+    border: health.state === 'error' ? '#5a0000' : '#4a3000',
+  }
+}
+
 // Convert battery.runtime (seconds) to human string
 function fmtRuntime(seconds) {
   if (seconds == null) return '—'
@@ -278,7 +290,8 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
   const v       = device.lastStatus || {}
   const rawSt   = v['ups.status']
   const state   = upsState(rawSt)
-  const st      = UPS_STATE_STYLE[state]
+  const health  = sourceHealth(device)
+  const st      = health || UPS_STATE_STYLE[state]
   const charge  = v['battery.charge']
   const load    = v['ups.load']
   const runtime = v['battery.runtime']
@@ -343,6 +356,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
           )}
           <div style={{ color: '#475569', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
             {device.host}:{device.port} · {device.upsName}
+            {health && <span style={{ color: st.color }}> · NUT {rawSt || 'unknown'}</span>}
           </div>
         </div>
 
@@ -465,6 +479,21 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
         </div>
       </div>
 
+      {health && (
+        <div style={{
+          color: st.color,
+          background: `${st.color}12`,
+          border: `1px solid ${st.border}`,
+          borderRadius: 5,
+          padding: '7px 9px',
+          marginBottom: 10,
+          fontSize: 12,
+          fontFamily: 'IBM Plex Mono, monospace',
+        }}>
+          UPS data source {health.state}: {health.message}
+        </div>
+      )}
+
       {confirmDel && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
@@ -541,7 +570,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
               fontSize: 10, padding: '1px 7px', borderRadius: 4,
               fontWeight: 700, fontFamily: 'monospace',
             }}>
-              ● {state !== 'unknown' ? state : (rawSt || '—')}
+              ● {health ? health.state.toUpperCase() : (state !== 'unknown' ? state : (rawSt || '—'))}
             </span>
           </div>
         </div>

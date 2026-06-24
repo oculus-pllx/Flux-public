@@ -3,6 +3,7 @@ const WebSocket = require('ws')
 const AgentMachine = require('../models/AgentMachine')
 const AgentMachineEvent = require('../models/AgentMachineEvent')
 const PowerEvent = require('../models/PowerEvent')
+const Device = require('../models/Device')
 const { buildShutdownScope } = require('./clusterService')
 const proxmoxService = require('./proxmoxService')
 const crypto = require('crypto')
@@ -162,7 +163,12 @@ async function handlePong(machineKey) {
 async function handleStatus(msg) {
   if (!msg.machineKey) return
   const machine = await AgentMachine.findOne({ where: { machineKey: msg.machineKey } })
-  if (machine) await machine.update({ lastSeen: new Date(), agentVersion: msg.agentVersion || machine.agentVersion })
+  if (!machine) return
+  await machine.update({ lastSeen: new Date(), agentVersion: msg.agentVersion || machine.agentVersion })
+  if (msg.nutHealth && machine.upsGroupId) {
+    const device = await Device.findByPk(machine.upsGroupId)
+    if (device) await device.update({ nutHealth: msg.nutHealth })
+  }
 }
 
 async function setState(machine, newState, detail = null) {

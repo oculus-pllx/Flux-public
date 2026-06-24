@@ -14,6 +14,7 @@ const Device = sequelize.define('Device', {
   active: { type: DataTypes.BOOLEAN, defaultValue: true },
   lastSeen: { type: DataTypes.DATE, allowNull: true },
   lastStatus: { type: DataTypes.JSON, allowNull: true },
+  nutHealth: { type: DataTypes.JSON, allowNull: true },
   shutdownActive: { type: DataTypes.BOOLEAN, defaultValue: false },
 })
 

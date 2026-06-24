@@ -104,6 +104,116 @@ describe('nut service', () => {
     })
   })
 
+  describe('discoverConfig', () => {
+    it('discovers the first local UPS from upsc -l', async () => {
+      setupExec(null, 'apc2200: APC Smart-UPS 2200 HID\nrackups: Rack UPS')
+
+      const { discoverConfig } = require('../services/nut')
+      const config = await discoverConfig()
+
+      expect(config).toEqual({ upsName: 'apc2200', sourceType: 'usb' })
+    })
+
+    it('throws a clear error when no local UPS is listed', async () => {
+      setupExec(null, '')
+
+      const { discoverConfig } = require('../services/nut')
+
+      await expect(discoverConfig()).rejects.toThrow('No local NUT UPS found')
+    })
+  })
+
+  describe('checkHealth', () => {
+    it('reports ok for a visible USB UPS with reachable NUT services', async () => {
+      setupExec(null, 'battery.charge: 100\nups.status: OL')
+      setupExec(null, 'active') // nut-server
+      setupExec(null, 'active') // nut-driver@myups
+      setupExec(null, 'Bus 001 Device 002: ID 051d:0003 American Power Conversion UPS')
+
+      const { checkHealth } = require('../services/nut')
+      const health = await checkHealth({
+        upsName: 'myups',
+        sourceType: 'usb',
+        vendorid: '051D',
+        productid: '0003',
+      }, { now: () => new Date('2026-06-24T14:00:00.000Z') })
+
+      expect(health).toMatchObject({
+        state: 'ok',
+        sourceType: 'usb',
+        message: 'USB data source healthy',
+        checkedAt: '2026-06-24T14:00:00.000Z',
+        checks: {
+          upscReachable: true,
+          nutServerActive: true,
+          nutDriverActive: true,
+          usbDevicePresent: true,
+        },
+      })
+    })
+
+    it('reports degraded when NUT answers but the configured USB device is missing', async () => {
+      setupExec(null, 'battery.charge: 100\nups.status: OL')
+      setupExec(null, 'active') // nut-server
+      setupExec(null, 'active') // nut-driver@myups
+      setupExec(new Error('no device')) // lsusb
+
+      const { checkHealth } = require('../services/nut')
+      const health = await checkHealth({
+        upsName: 'myups',
+        sourceType: 'usb',
+        vendorid: '051D',
+        productid: '0003',
+      }, { now: () => new Date('2026-06-24T14:01:00.000Z') })
+
+      expect(health.state).toBe('degraded')
+      expect(health.message).toBe('USB UPS device 051d:0003 is not visible on this host')
+      expect(health.checks.upscReachable).toBe(true)
+      expect(health.checks.usbDevicePresent).toBe(false)
+    })
+
+    it('infers USB vendor and product IDs from NUT variables when config omits them', async () => {
+      setupExec(null, [
+        'driver.parameter.vendorid: 051D',
+        'driver.parameter.productid: 0003',
+        'ups.status: OL',
+      ].join('\n'))
+      setupExec(null, 'active') // nut-server
+      setupExec(null, 'active') // nut-driver@myups
+      setupExec(new Error('no device')) // lsusb
+
+      const { checkHealth } = require('../services/nut')
+      const health = await checkHealth({
+        upsName: 'myups',
+        sourceType: 'usb',
+      }, { now: () => new Date('2026-06-24T14:01:30.000Z') })
+
+      expect(health.state).toBe('degraded')
+      expect(health.message).toBe('USB UPS device 051d:0003 is not visible on this host')
+      expect(health.checks.usbDevicePresent).toBe(false)
+    })
+
+    it('reports error when NUT polling fails', async () => {
+      setupExec(new Error('Error: Data stale'))
+      setupExec(null, 'active') // nut-server
+      setupExec(new Error('inactive')) // nut-driver@myups
+      setupExec(new Error('no device')) // lsusb
+
+      const { checkHealth } = require('../services/nut')
+      const health = await checkHealth({
+        upsName: 'myups',
+        sourceType: 'usb',
+        vendorid: '051D',
+      }, { now: () => new Date('2026-06-24T14:02:00.000Z') })
+
+      expect(health.state).toBe('error')
+      expect(health.message).toBe('NUT polling failed: Error: Data stale')
+      expect(health.checks.upscReachable).toBe(false)
+      expect(health.checks.nutDriverActive).toBe(false)
+      expect(health.checks.usbDevicePresent).toBe(false)
+    })
+  })
+
   describe('applyManagedConfig', () => {
     it('does not write or restart NUT when managedByFlux is not enabled', async () => {
       const { applyManagedConfig } = require('../services/nut')

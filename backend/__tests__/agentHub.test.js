@@ -6,6 +6,7 @@ const WebSocket = require('ws')
 const { sequelize } = require('../config/database')
 const AgentMachine = require('../models/AgentMachine')
 const AgentMachineEvent = require('../models/AgentMachineEvent')
+const Device = require('../models/Device')
 
 let server, hub, port
 
@@ -136,6 +137,56 @@ describe('agentHub', () => {
     ws.send(JSON.stringify({ type: 'pong', machineKey }))
     await expect(pongFired).resolves.toBeUndefined()
 
+    ws.close()
+  })
+
+  it('stores NUT source health on the linked UPS device', async () => {
+    const device = await Device.create({
+      name: 'APC 2200',
+      host: '10.11.200.23',
+      upsName: 'apc2200',
+      pollInterval: 30,
+    })
+    const machineKey = 'nut-health-key'
+    await AgentMachine.create({
+      machineKey,
+      hostname: 'nut-host',
+      role: 'ups-host',
+      upsGroupId: device.id,
+      state: 'online',
+    })
+
+    const ws = await openWs()
+    const nutHealth = {
+      state: 'degraded',
+      sourceType: 'usb',
+      message: 'USB UPS device 051d:0003 is not visible on this host',
+      checkedAt: '2026-06-24T14:00:00.000Z',
+      checks: {
+        upscReachable: true,
+        nutServerActive: true,
+        nutDriverActive: true,
+        usbDevicePresent: false,
+      },
+    }
+
+    ws.send(JSON.stringify({
+      type: 'register', machineKey, hostname: 'nut-host',
+      role: 'ups-host', virtualization: 'none', os: 'Debian 12', agentVersion: '1.0.0',
+      capabilities: [],
+    }))
+    await new Promise(r => setTimeout(r, 100))
+    ws.send(JSON.stringify({
+      type: 'status',
+      machineKey,
+      nutStatus: 'OL',
+      upsVars: { 'ups.status': 'OL', 'battery.charge': '100' },
+      nutHealth,
+    }))
+    await new Promise(r => setTimeout(r, 100))
+
+    await device.reload()
+    expect(device.nutHealth).toEqual(nutHealth)
     ws.close()
   })
 })

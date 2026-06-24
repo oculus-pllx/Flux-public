@@ -21,10 +21,21 @@ function fmt(val, suffix = '') {
   return val !== undefined && val !== null ? `${val}${suffix}` : '—'
 }
 
+function sourceHealth(device) {
+  const health = device.nutHealth
+  if (!health || !['degraded', 'error'].includes(health.state)) return null
+  return {
+    label: health.state === 'error' ? 'Source Error' : 'Source Degraded',
+    message: health.message || 'UPS data source needs attention',
+    color: health.state === 'error' ? 'var(--flux-critical)' : 'var(--flux-warning)',
+  }
+}
+
 export default function DeviceCard({ device, onEdit, onDelete }) {
   const navigate = useNavigate()
   const v = device.lastStatus || {}
-  const status = getStatus(v['ups.status'])
+  const health = sourceHealth(device)
+  const status = health || getStatus(v['ups.status'])
   const charge  = v['battery.charge']
   const load    = v['ups.load']
   const runtime = v['battery.runtime']
@@ -58,11 +69,19 @@ export default function DeviceCard({ device, onEdit, onDelete }) {
             </p>
           </div>
           <span className="flex items-center gap-1.5 text-xs font-sans px-2 py-0.5 rounded-full"
+            title={health ? `NUT status: ${v['ups.status'] || 'unknown'}` : undefined}
             style={{ background: `${status.color}18`, color: status.color }}>
             <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: status.color }} />
             {status.label}
           </span>
         </div>
+
+        {health && (
+          <div className="font-mono text-xs mb-3 px-3 py-2 rounded"
+            style={{ color: health.color, background: `${health.color}14`, border: `1px solid ${health.color}55` }}>
+            {health.message}
+          </div>
+        )}
 
         {/* Battery charge bar */}
         {charge !== undefined && (

@@ -203,22 +203,38 @@ async function main() {
 
   // NUT status polling for ups-host role.
   // We only poll — never reconfigure a NUT server that is already running.
-  if ((role === 'ups-host' || role === 'both') && cfg.nutConfig) {
+  if (role === 'ups-host' || role === 'both') {
     const nut = require('./services/nut')
 
     const nutPollInterval = setInterval(async () => {
+      const currentCfg = enrollment.getConfig()
+      let nutConfig = currentCfg.nutConfig
       try {
-        const currentCfg = enrollment.getConfig()
-        if (!currentCfg.nutConfig) return
-        const upsVars = await nut.pollStatus(currentCfg.nutConfig.upsName)
+        nutConfig = nutConfig || await nut.discoverConfig()
+        const upsVars = await nut.pollStatus(nutConfig.upsName)
+        const nutHealth = await nut.checkHealth(nutConfig)
         wsClient.send({
           type: 'status',
           machineKey: currentCfg.machineKey,
           nutStatus: upsVars['ups.status'] || 'UNKNOWN',
           upsVars,
+          nutHealth,
         })
       } catch (err) {
         console.error('[agent] NUT poll failed:', err.message)
+        if (!nutConfig) return
+        try {
+          const nutHealth = await nut.checkHealth(nutConfig)
+          wsClient.send({
+            type: 'status',
+            machineKey: currentCfg.machineKey,
+            nutStatus: 'UNKNOWN',
+            upsVars: {},
+            nutHealth,
+          })
+        } catch (healthErr) {
+          console.error('[agent] NUT health check failed:', healthErr.message)
+        }
       }
     }, 30000)
 

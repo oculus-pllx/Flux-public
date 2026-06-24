@@ -10,6 +10,10 @@ function run(cmd) {
   })
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
+}
+
 /** Returns true if NUT is installed (service active OR upsc binary present). */
 async function isNutInstalled() {
   try {
@@ -124,6 +128,140 @@ async function pollStatus(upsName) {
   return status
 }
 
+async function discoverConfig(options = {}) {
+  const runner = options.run || run
+  const output = await runner('upsc -l')
+  const first = output.split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.split(':')[0].trim())
+    .find(Boolean)
+
+  if (!first) throw new Error('No local NUT UPS found')
+  return { upsName: first, sourceType: 'usb' }
+}
+
+async function commandOk(cmd, runner = run) {
+  try {
+    await runner(cmd)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function normalizeUsbId(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function usbDeviceLabel(nutConfig, status = {}) {
+  const vendorid = normalizeUsbId(
+    nutConfig.vendorid || nutConfig.vendorId || status['driver.parameter.vendorid'] || status['ups.vendorid']
+  )
+  const productid = normalizeUsbId(
+    nutConfig.productid || nutConfig.productId || status['driver.parameter.productid'] || status['ups.productid']
+  )
+  if (vendorid && productid) return `${vendorid}:${productid}`
+  if (vendorid) return vendorid
+  return ''
+}
+
+async function checkHealth(nutConfig, options = {}) {
+  const runner = options.run || run
+  const now = options.now || (() => new Date())
+  const sourceType = nutConfig?.sourceType || (nutConfig?.driver === 'snmp-ups' ? 'snmp' : 'usb')
+  const checkedAt = now().toISOString()
+  const checks = {
+    upscReachable: false,
+    nutServerActive: false,
+    nutDriverActive: false,
+  }
+
+  let pollError = null
+  let status = {}
+  try {
+    status = await pollStatusWithRunner(nutConfig.upsName, runner)
+    checks.upscReachable = true
+  } catch (err) {
+    pollError = err
+  }
+
+  checks.nutServerActive = await commandOk('systemctl is-active --quiet nut-server', runner)
+
+  if (nutConfig?.upsName) {
+    checks.nutDriverActive = await commandOk(`systemctl is-active --quiet ${shellQuote(`nut-driver@${nutConfig.upsName}`)}`, runner)
+  }
+
+  if (sourceType === 'usb') {
+    const usbId = usbDeviceLabel(nutConfig, status)
+    if (usbId) {
+      checks.usbDevicePresent = await commandOk(`lsusb -d ${shellQuote(usbId.includes(':') ? usbId : `${usbId}:`)}`, runner)
+    } else {
+      checks.usbDevicePresent = null
+    }
+
+    if (!checks.upscReachable) {
+      return {
+        state: 'error',
+        sourceType,
+        message: `NUT polling failed: ${pollError.message}`,
+        checkedAt,
+        checks,
+      }
+    }
+
+    if (checks.usbDevicePresent === false) {
+      return {
+        state: 'degraded',
+        sourceType,
+        message: `USB UPS device ${usbId} is not visible on this host`,
+        checkedAt,
+        checks,
+      }
+    }
+
+    return {
+      state: 'ok',
+      sourceType,
+      message: 'USB data source healthy',
+      checkedAt,
+      checks,
+    }
+  }
+
+  if (!checks.upscReachable) {
+    return {
+      state: 'error',
+      sourceType,
+      message: `NUT polling failed: ${pollError.message}`,
+      checkedAt,
+      checks,
+    }
+  }
+
+  return {
+    state: 'ok',
+    sourceType,
+    message: `${sourceType.toUpperCase()} data source healthy`,
+    checkedAt,
+    checks,
+  }
+}
+
+async function pollStatusWithRunner(upsName, runner) {
+  const output = await runner(`upsc ${shellQuote(upsName)}`)
+  const status = {}
+  for (const line of output.split('\n')) {
+    const idx = line.indexOf(':')
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim()
+      const val = line.slice(idx + 1).trim()
+      status[key] = val
+    }
+  }
+  return status
+}
+
 /**
  * Full NUT setup: install if missing, write all config files, restart service.
  * nutConfig: { upsName, driver, port, desc, upsdPort, upsdUser }
@@ -156,6 +294,8 @@ module.exports = {
   restartNut,
   backupNutConfig,
   pollStatus,
+  discoverConfig,
+  checkHealth,
   setup,
   applyManagedConfig,
 }
