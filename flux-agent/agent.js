@@ -107,6 +107,43 @@ async function handleMessage(msg) {
       break
     }
 
+    case 'nut-reprobe': {
+      const currentCfg = enrollment.getConfig()
+      const nut = require('./services/nut')
+      try {
+        const nutConfig = currentCfg.nutConfig || await nut.discoverConfig()
+        const upsName = msg.upsName || nutConfig.upsName
+        await nut.restartServices(upsName)
+        const effectiveConfig = { ...nutConfig, upsName }
+        const upsVars = await nut.pollStatus(upsName)
+        const nutHealth = await nut.checkHealth(effectiveConfig)
+        wsClient.send({
+          type: 'nut-reprobe-result',
+          requestId: msg.requestId,
+          machineKey: currentCfg.machineKey,
+          deviceId: msg.deviceId,
+          ok: true,
+          restarted: true,
+          upsVars,
+          nutHealth,
+          variableInventory: {
+            count: Object.keys(upsVars).length,
+            keys: Object.keys(upsVars).sort(),
+          },
+        })
+      } catch (err) {
+        wsClient.send({
+          type: 'nut-reprobe-result',
+          requestId: msg.requestId,
+          machineKey: currentCfg.machineKey,
+          deviceId: msg.deviceId,
+          ok: false,
+          error: err.message,
+        })
+      }
+      break
+    }
+
     case 'update-available': {
       const { updatePolicy } = enrollment.getConfig()
       console.log(`[agent] Update available: v${msg.version} (policy: ${updatePolicy || 'manual'})`)

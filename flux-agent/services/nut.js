@@ -87,6 +87,11 @@ async function restartNut() {
   await run('systemctl restart nut-server')
 }
 
+async function restartServices(upsName) {
+  if (upsName) await run(`systemctl restart ${shellQuote(`nut-driver@${upsName}`)}`)
+  await restartNut()
+}
+
 function timestamp() {
   return new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-')
 }
@@ -292,6 +297,7 @@ module.exports = {
   writeUpsdConf,
   writeUpsdUsers,
   restartNut,
+  restartServices,
   backupNutConfig,
   pollStatus,
   discoverConfig,

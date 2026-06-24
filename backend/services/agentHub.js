@@ -76,6 +76,9 @@ async function handleMessage(ws, msg, setKey) {
     case 'status':
       await handleStatus(msg)
       break
+    case 'nut-reprobe-result':
+      handleAgentResponse(msg)
+      break
     default:
       // unknown message type — ignore
   }
@@ -183,6 +186,37 @@ function sendToMachine(machineKey, payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false
   ws.send(JSON.stringify(payload))
   return true
+}
+
+function handleAgentResponse(msg) {
+  if (!msg.requestId) return
+  hub.emit(`response:${msg.requestId}`, msg)
+}
+
+function requestMachine(machineKey, payload, options = {}) {
+  const requestId = payload.requestId || crypto.randomUUID()
+  const timeoutMs = options.timeoutMs || 30000
+
+  return new Promise((resolve, reject) => {
+    const event = `response:${requestId}`
+    const timer = setTimeout(() => {
+      hub.removeListener(event, onResponse)
+      reject(new Error('Agent response timed out'))
+    }, timeoutMs)
+
+    function onResponse(msg) {
+      clearTimeout(timer)
+      resolve(msg)
+    }
+
+    hub.once(event, onResponse)
+    const sent = sendToMachine(machineKey, { ...payload, requestId })
+    if (!sent) {
+      clearTimeout(timer)
+      hub.removeListener(event, onResponse)
+      reject(new Error('Agent not connected'))
+    }
+  })
 }
 
 async function notifyShutdown(deviceId) {
@@ -325,6 +359,7 @@ function getConnectedCount() {
 hub.attach = attach
 hub.detach = detach
 hub.sendToMachine = sendToMachine
+hub.requestMachine = requestMachine
 hub.notifyShutdown = notifyShutdown
 hub.notifyPowerRestored = notifyPowerRestored
 hub.getConnectedCount = getConnectedCount

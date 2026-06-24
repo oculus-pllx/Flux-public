@@ -123,6 +123,19 @@ describe('nut service', () => {
     })
   })
 
+  describe('restartServices', () => {
+    it('restarts the specific NUT driver and NUT server', async () => {
+      setupExec(null, '')
+      setupExec(null, '')
+
+      const { restartServices } = require('../services/nut')
+      await restartServices('myups')
+
+      expect(mockExec).toHaveBeenNthCalledWith(1, "systemctl restart 'nut-driver@myups'", expect.any(Function))
+      expect(mockExec).toHaveBeenNthCalledWith(2, 'systemctl restart nut-server', expect.any(Function))
+    })
+  })
+
   describe('checkHealth', () => {
     it('reports ok for a visible USB UPS with reachable NUT services', async () => {
       setupExec(null, 'battery.charge: 100\nups.status: OL')

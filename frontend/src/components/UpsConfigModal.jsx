@@ -80,9 +80,11 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [repairBusy, setRepairBusy] = useState(false)
   const [sourceBusy, setSourceBusy] = useState(false)
+  const [reprobeBusy, setReprobeBusy] = useState(false)
   const [error, setError] = useState('')
   const [repairMsg, setRepairMsg] = useState('')
   const [sourceMsg, setSourceMsg] = useState('')
+  const [reprobeResult, setReprobeResult] = useState(null)
 
   const updateForm = key => e => {
     const value = key === 'active' ? e.target.checked : e.target.value
@@ -204,6 +206,28 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
     }
   }
 
+  async function reprobe() {
+    setReprobeBusy(true)
+    setError('')
+    setReprobeResult(null)
+    try {
+      const { data } = await axios.post(`/api/devices/${device.id}/reprobe`, {}, { headers })
+      setReprobeResult(data)
+      onSaved(data.device)
+      setForm(p => ({
+        ...p,
+        host: data.device.host,
+        port: String(data.device.port),
+        upsName: data.device.upsName,
+        nutPassword: '',
+      }))
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'UPS re-detect failed')
+    } finally {
+      setReprobeBusy(false)
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.68)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'var(--flux-panel)', border: '1px solid var(--flux-border)', borderRadius: 10, width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 20 }}>
@@ -234,11 +258,11 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
           {error && <p style={{ color: 'var(--flux-critical)', fontSize: 12, margin: 0 }}>{error}</p>}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button type="button" onClick={onClose} disabled={busy || repairBusy || sourceBusy}
+            <button type="button" onClick={onClose} disabled={busy || repairBusy || sourceBusy || reprobeBusy}
               style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)', borderRadius: 7, padding: '8px 14px', cursor: 'pointer' }}>
               Cancel
             </button>
-            <button type="submit" disabled={busy || repairBusy || sourceBusy}
+            <button type="submit" disabled={busy || repairBusy || sourceBusy || reprobeBusy}
               style={{ background: 'var(--flux-accent)', border: '1px solid var(--flux-accent)', color: '#fff', borderRadius: 7, padding: '8px 14px', cursor: 'pointer', opacity: busy ? 0.65 : 1 }}>
               {busy ? 'Saving...' : 'Save UPS'}
             </button>
@@ -284,7 +308,7 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
             <TextInput label="New NUT Password" type="password" value={ssh.nutPassword} onChange={updateSsh('nutPassword')} placeholder="leave blank to generate" />
             {repairMsg && <p style={{ color: 'var(--flux-healthy)', fontSize: 12, margin: 0 }}>{repairMsg}</p>}
             <div>
-              <button type="button" onClick={repair} disabled={busy || repairBusy || sourceBusy || !ssh.host}
+              <button type="button" onClick={repair} disabled={busy || repairBusy || sourceBusy || reprobeBusy || !ssh.host}
                 style={{ background: 'none', border: '1px solid var(--flux-accent)', color: 'var(--flux-accent)', borderRadius: 7, padding: '8px 14px', cursor: repairBusy ? 'not-allowed' : 'pointer', opacity: repairBusy || !ssh.host ? 0.6 : 1 }}>
                 {repairBusy ? 'Configuring...' : 'Configure Full-Control NUT User'}
               </button>
@@ -330,14 +354,52 @@ export default function UpsConfigModal({ device, headers, onClose, onSaved }) {
             )}
             {sourceMsg && <p style={{ color: 'var(--flux-healthy)', fontSize: 12, margin: 0 }}>{sourceMsg}</p>}
             <div>
-              <button type="button" onClick={applySource} disabled={busy || repairBusy || sourceBusy || !ssh.host || (source.sourceType === 'snmp' && !source.snmpHost)}
+              <button type="button" onClick={applySource} disabled={busy || repairBusy || sourceBusy || reprobeBusy || !ssh.host || (source.sourceType === 'snmp' && !source.snmpHost)}
                 style={{ background: 'none', border: '1px solid var(--flux-accent)', color: 'var(--flux-accent)', borderRadius: 7, padding: '8px 14px', cursor: sourceBusy ? 'not-allowed' : 'pointer', opacity: sourceBusy || !ssh.host || (source.sourceType === 'snmp' && !source.snmpHost) ? 0.6 : 1 }}>
                 {sourceBusy ? 'Switching...' : 'Apply Input Source'}
               </button>
             </div>
           </div>
         </div>
+
+        <div style={{ borderTop: '1px solid var(--flux-border)', marginTop: 18, paddingTop: 16 }}>
+          <h3 style={{ color: 'var(--flux-text)', fontSize: 13, fontWeight: 700, margin: '0 0 10px' }}>Replace / Re-detect UPS</h3>
+          <p style={{ color: 'var(--flux-muted)', fontSize: 12, margin: '0 0 12px', lineHeight: 1.5 }}>
+            Restart the UPS host NUT driver/server, immediately pull every NUT variable, and compare the new UPS identity and data points with the previous poll.
+          </p>
+          <button type="button" onClick={reprobe} disabled={busy || repairBusy || sourceBusy || reprobeBusy}
+            style={{ background: 'none', border: '1px solid var(--flux-warning)', color: 'var(--flux-warning)', borderRadius: 7, padding: '8px 14px', cursor: reprobeBusy ? 'not-allowed' : 'pointer', opacity: reprobeBusy ? 0.6 : 1 }}>
+            {reprobeBusy ? 'Re-detecting...' : 'Restart NUT and Re-detect UPS'}
+          </button>
+          {reprobeResult && (
+            <div style={{ marginTop: 12, background: 'var(--flux-bg)', border: '1px solid var(--flux-border)', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <IdentityBlock title="Before" identity={reprobeResult.identity?.before} />
+                <IdentityBlock title="After" identity={reprobeResult.identity?.after} />
+              </div>
+              <div style={{ color: 'var(--flux-muted)', fontSize: 12, marginTop: 10, fontFamily: 'IBM Plex Mono, monospace' }}>
+                Variables: {reprobeResult.variables?.count ?? 0}
+                {reprobeResult.variables?.added?.length > 0 && ` · added ${reprobeResult.variables.added.join(', ')}`}
+                {reprobeResult.variables?.removed?.length > 0 && ` · removed ${reprobeResult.variables.removed.join(', ')}`}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  )
+}
+
+function IdentityBlock({ title, identity }) {
+  return (
+    <div>
+      <p style={{ color: 'var(--flux-dim)', fontSize: 10, letterSpacing: '0.08em', margin: '0 0 5px' }}>{title}</p>
+      <p style={{ color: 'var(--flux-text)', fontSize: 12, margin: 0, fontFamily: 'IBM Plex Mono, monospace' }}>
+        {identity?.model || 'Unknown model'}
+      </p>
+      <p style={{ color: 'var(--flux-muted)', fontSize: 11, margin: '3px 0 0', fontFamily: 'IBM Plex Mono, monospace' }}>
+        {identity?.serial || 'No serial'}
+      </p>
     </div>
   )
 }

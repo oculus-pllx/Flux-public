@@ -13,6 +13,9 @@ jest.mock('../services/pollingService', () => ({
 jest.mock('../services/nutService', () => ({
   pollDevice: jest.fn(),
 }))
+jest.mock('../services/agentHub', () => ({
+  requestMachine: jest.fn(),
+}))
 
 const request = require('supertest')
 const express = require('express')
@@ -20,7 +23,9 @@ const jwt     = require('jsonwebtoken')
 const { sequelize } = require('../config/database')
 const sshService = require('../services/sshService')
 const nutService = require('../services/nutService')
+const agentHub = require('../services/agentHub')
 const Device = require('../models/Device')
+const AgentMachine = require('../models/AgentMachine')
 
 const app = express()
 app.use(express.json())
@@ -236,5 +241,96 @@ describe('POST /api/devices/:id/source', () => {
 
     expect(res.status).toBe(400)
     expect(sshService.configureNutSource).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/devices/:id/reprobe', () => {
+  it('asks the linked UPS-host agent to restart NUT and saves all returned variables', async () => {
+    const device = await Device.create({
+      name: 'Rack UPS',
+      host: '10.11.200.23',
+      port: 3493,
+      upsName: 'apc2200',
+      pollInterval: 30,
+      lastStatus: {
+        'ups.model': 'Smart-UPS 2200',
+        'ups.serial': 'OLD2200',
+        'ups.status': 'OL',
+        'battery.charge': '100',
+      },
+    })
+    await AgentMachine.create({
+      machineKey: 'ups-agent-key',
+      hostname: 'sms-pve-3',
+      role: 'ups-host',
+      upsGroupId: device.id,
+      active: true,
+    })
+
+    const upsVars = {
+      'ups.model': 'Smart-UPS 1500',
+      'ups.serial': 'NEW1500',
+      'ups.status': 'OL',
+      'battery.charge': '98',
+      'ups.load': '22',
+      'input.voltage': '121.0',
+      'output.voltage': '121.0',
+    }
+    const nutHealth = {
+      state: 'ok',
+      sourceType: 'usb',
+      message: 'USB data source healthy',
+      checks: { upscReachable: true },
+    }
+    agentHub.requestMachine.mockResolvedValue({
+      ok: true,
+      upsVars,
+      nutHealth,
+      restarted: true,
+      variableInventory: {
+        count: Object.keys(upsVars).length,
+        keys: Object.keys(upsVars).sort(),
+      },
+    })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/reprobe`)
+      .set(auth)
+      .send({})
+
+    expect(res.status).toBe(200)
+    expect(agentHub.requestMachine).toHaveBeenCalledWith(
+      'ups-agent-key',
+      expect.objectContaining({ type: 'nut-reprobe', deviceId: device.id, upsName: 'apc2200' }),
+      expect.objectContaining({ timeoutMs: 45000 })
+    )
+    expect(res.body.identity.before).toMatchObject({ model: 'Smart-UPS 2200', serial: 'OLD2200' })
+    expect(res.body.identity.after).toMatchObject({ model: 'Smart-UPS 1500', serial: 'NEW1500' })
+    expect(res.body.variables.added).toEqual(['input.voltage', 'output.voltage', 'ups.load'])
+    expect(res.body.variables.count).toBe(7)
+    expect(res.body.device.lastStatus).toMatchObject(upsVars)
+    expect(res.body.device.nutHealth).toEqual(nutHealth)
+
+    await device.reload()
+    expect(device.lastStatus).toEqual(upsVars)
+    expect(device.nutHealth).toEqual(nutHealth)
+  })
+
+  it('returns 409 when no linked UPS-host agent is online for reprobe', async () => {
+    const device = await Device.create({
+      name: 'Rack UPS',
+      host: '10.11.200.23',
+      port: 3493,
+      upsName: 'apc2200',
+      pollInterval: 30,
+    })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/reprobe`)
+      .set(auth)
+      .send({})
+
+    expect(res.status).toBe(409)
+    expect(agentHub.requestMachine).not.toHaveBeenCalled()
   })
 })

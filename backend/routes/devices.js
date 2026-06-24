@@ -2,6 +2,7 @@ const crypto = require('crypto')
 const router = require('express').Router()
 const { authenticate, requireRole } = require('../middleware/auth')
 const Device = require('../models/Device')
+const AgentMachine = require('../models/AgentMachine')
 const pollingService = require('../services/pollingService')
 const {
   assertHost,
@@ -60,6 +61,33 @@ router.get('/:id', async (req, res, next) => {
 function sshMachineFromBody(body) {
   const { host, sshPort, sshUser, sshAuthType, sshPassword, sshKeyPath, sshKeyContent } = body
   return { host, sshPort: sshPort || 22, sshUser: sshUser || 'root', sshAuthType, sshPassword, sshKeyPath, sshKeyContent }
+}
+
+function upsIdentity(status = {}) {
+  return {
+    model: status['ups.model'] || status['device.model'] || null,
+    serial: status['ups.serial'] || status['device.serial'] || null,
+    manufacturer: status['ups.mfr'] || status['device.mfr'] || null,
+    firmware: status['ups.firmware'] || null,
+  }
+}
+
+function variableSummary(before = {}, after = {}) {
+  const beforeKeys = Object.keys(before).sort()
+  const afterKeys = Object.keys(after).sort()
+  const beforeSet = new Set(beforeKeys)
+  const afterSet = new Set(afterKeys)
+  return {
+    count: afterKeys.length,
+    keys: afterKeys,
+    added: afterKeys.filter(key => !beforeSet.has(key)),
+    removed: beforeKeys.filter(key => !afterSet.has(key)),
+    categories: afterKeys.reduce((acc, key) => {
+      const category = key.includes('.') ? key.split('.')[0] : 'other'
+      acc[category] = (acc[category] || 0) + 1
+      return acc
+    }, {}),
+  }
 }
 
 // Read NUT config from a remote host over SSH. Throws a 422 error with
@@ -264,6 +292,58 @@ router.post('/:id/source', requireRole('admin', 'operator'), async (req, res, ne
     pollingService.scheduleDevice(device)
     res.json({ configured: true, sourceType: source.sourceType, device: sanitizeDevice(device), discovered })
   } catch (err) { next(err) }
+})
+
+router.post('/:id/reprobe', requireRole('admin', 'operator'), async (req, res, next) => {
+  try {
+    const device = await Device.findByPk(req.params.id)
+    if (!device) return res.status(404).json({ error: 'Not found' })
+
+    const agents = await AgentMachine.findAll({
+      where: { upsGroupId: device.id, active: true },
+      order: [['updatedAt', 'DESC']],
+    })
+    const agent = agents.find(machine => ['ups-host', 'both'].includes(machine.role) && machine.machineKey)
+    if (!agent || !['ups-host', 'both'].includes(agent.role) || !agent.machineKey) {
+      return res.status(409).json({ error: 'No linked UPS-host agent is available for reprobe.' })
+    }
+
+    const agentHub = require('../services/agentHub')
+    const response = await agentHub.requestMachine(agent.machineKey, {
+      type: 'nut-reprobe',
+      deviceId: device.id,
+      upsName: device.upsName,
+    }, { timeoutMs: 45000 })
+
+    if (!response.ok) {
+      return res.status(502).json({ error: response.error || 'UPS reprobe failed' })
+    }
+
+    const before = device.lastStatus || {}
+    const after = response.upsVars || {}
+    await device.update({
+      lastStatus: after,
+      lastSeen: new Date(),
+      nutHealth: response.nutHealth || null,
+    })
+    pollingService.scheduleDevice(device)
+
+    res.json({
+      ok: true,
+      restarted: response.restarted === true,
+      identity: {
+        before: upsIdentity(before),
+        after: upsIdentity(after),
+      },
+      variables: variableSummary(before, after),
+      device: sanitizeDevice(device),
+    })
+  } catch (err) {
+    if (err.message === 'Agent not connected' || err.message === 'Agent response timed out') {
+      return res.status(409).json({ error: err.message })
+    }
+    next(err)
+  }
 })
 
 router.post('/', requireRole('admin', 'operator'), async (req, res, next) => {
