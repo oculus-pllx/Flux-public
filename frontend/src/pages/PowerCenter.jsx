@@ -409,7 +409,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
                   ? 'NUT credentials required — configure in Device Settings'
                   : beeperDisabled
                     ? 'Enable the UPS beeper'
-                    : 'Disable beeper when supported, otherwise send temporary mute'
+                  : 'Disable the UPS beeper'
               }
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -422,12 +422,12 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
                 opacity: !device.hasNutCredentials ? 0.4 : 1,
               }}>
               {mutePhase === 'busy'
-                ? (beeperDisabled ? 'Enabling…' : 'Silencing…')
+                ? (beeperDisabled ? 'Enabling…' : 'Disabling…')
                 : mutePhase === 'ok'
                   ? muteMsg
                   : beeperDisabled
                     ? '🔔 Enable beeper'
-                    : '🔕 Silence beeper'}
+                    : '🔕 Disable beeper'}
             </button>
           )}
           {canWrite && machines && machines.length > 0 && (

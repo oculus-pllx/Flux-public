@@ -153,7 +153,12 @@ router.post('/commands/:cmd', requireRole('admin', 'operator'), async (req, res,
     if (!requireNutCredentials(device, res)) return
     const client = getClient(device)
     await client.runCommand(device.upsName, req.params.cmd)
-    res.json({ ok: true, command: req.params.cmd })
+    const expectedStatus = expectedBeeperStatus(req.params.cmd)
+    const status = expectedStatus
+      ? await pollUntilBeeperStatus(device, expectedStatus)
+      : await pollDeviceStatus(device)
+    await device.update({ lastStatus: status, lastSeen: new Date() })
+    res.json({ ok: true, command: req.params.cmd, device: sanitizeDevice(device) })
   } catch (err) { next(err) }
 })
 

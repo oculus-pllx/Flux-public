@@ -122,7 +122,9 @@ export default function DeviceDetail() {
   async function runCmd(cmd) {
     setCmdBusy(true)
     try {
-      await axios.post(`/api/devices/${id}/control/commands/${encodeURIComponent(cmd)}`, {}, { headers })
+      const { data } = await axios.post(`/api/devices/${id}/control/commands/${encodeURIComponent(cmd)}`, {}, { headers })
+      if (data?.device) setDevice(data.device)
+      else await pollNow()
     } catch (err) {
       alert(`Command failed: ${err.response?.data?.error || err.message}`)
     }
