@@ -102,6 +102,18 @@ describe('nut service', () => {
       expect(status['battery.charge']).toBe('100')
       expect(status['ups.load']).toBe('25')
     })
+
+    it('retries polling when NUT is briefly unavailable after restart', async () => {
+      setupExec(new Error('Error: Connection failure: Connection refused'))
+      setupExec(null, 'ups.status: OL\nups.model: Smart-UPS 1500')
+
+      const { pollStatusWithRetry } = require('../services/nut')
+      const status = await pollStatusWithRetry('myups', { attempts: 2, delayMs: 1 })
+
+      expect(status['ups.status']).toBe('OL')
+      expect(mockExec).toHaveBeenNthCalledWith(1, 'upsc myups', expect.any(Function))
+      expect(mockExec).toHaveBeenNthCalledWith(2, 'upsc myups', expect.any(Function))
+    })
   })
 
   describe('discoverConfig', () => {

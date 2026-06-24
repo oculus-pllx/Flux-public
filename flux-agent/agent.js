@@ -115,7 +115,7 @@ async function handleMessage(msg) {
         const upsName = msg.upsName || nutConfig.upsName
         await nut.restartServices(upsName)
         const effectiveConfig = { ...nutConfig, upsName }
-        const upsVars = await nut.pollStatus(upsName)
+        const upsVars = await nut.pollStatusWithRetry(upsName)
         const nutHealth = await nut.checkHealth(effectiveConfig)
         wsClient.send({
           type: 'nut-reprobe-result',

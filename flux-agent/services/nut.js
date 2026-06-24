@@ -139,6 +139,27 @@ async function pollStatus(upsName) {
   return status
 }
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function pollStatusWithRetry(upsName, options = {}) {
+  const attempts = options.attempts || 10
+  const delayMs = options.delayMs || 500
+  let lastError = null
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await pollStatus(upsName)
+    } catch (err) {
+      lastError = err
+      if (i < attempts - 1) await delay(delayMs)
+    }
+  }
+
+  throw lastError
+}
+
 async function discoverConfig(options = {}) {
   const runner = options.run || run
   const output = await runner('upsc -l')
@@ -306,6 +327,7 @@ module.exports = {
   restartServices,
   backupNutConfig,
   pollStatus,
+  pollStatusWithRetry,
   discoverConfig,
   checkHealth,
   setup,
