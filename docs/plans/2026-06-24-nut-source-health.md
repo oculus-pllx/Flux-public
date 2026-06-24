@@ -101,18 +101,45 @@ Expected: PASS.
 **Files:**
 - No new files.
 
-- [ ] **Step 1: Run backend and agent tests**
+- [x] **Step 1: Run backend and agent tests**
 
 Run: `cd backend && npm test -- --runInBand`; `cd flux-agent && npm test -- --runInBand`
 
-Expected: PASS.
+Result: PASS in both public and private checkouts after the reprobe/offline fixes.
 
-- [ ] **Step 2: Build frontend**
+- [x] **Step 2: Build frontend**
 
 Run: `cd frontend && npm run build`
 
-Expected: PASS.
+Result: PASS during the production packaging pass.
 
-- [ ] **Step 3: Deploy manually to local Docker install only after tests pass**
+- [x] **Step 3: Deploy manually to local Docker install only after tests pass**
 
-Use the private/local install details provided by the user and report exact files changed.
+Result: deployed to native prod `.135`, UPS host `.23`, and local Docker prod `.25`. Rebuilt `.25` Docker backend and verified healthy.
+
+### Task 6: Reprobe and Offline Follow-up
+
+**Files:**
+- Modify: `flux-agent/services/nut.js`
+- Modify: `flux-agent/agent.js`
+- Modify: `backend/routes/devices.js`
+- Modify: `backend/services/pollingService.js`
+- Test: `flux-agent/__tests__/nut.test.js`
+- Test: `backend/__tests__/deviceNutRoute.test.js`
+- Test: `backend/__tests__/pollingService.test.js`
+
+- [x] **Step 1: Reprobe handles NUT restart timing**
+
+The UPS-host agent now retries `upsc` after restarting NUT so transient `Connection refused` from `upsd` startup does not fail the UI action.
+
+- [x] **Step 2: Reprobe handles driver restart failure**
+
+The UPS-host agent falls back to `upsdrvctl start <upsName>` when `systemctl restart nut-driver@<upsName>` exits nonzero.
+
+- [x] **Step 3: Reprobe updates the current Flux device identity**
+
+Backend reprobe saves the returned variables and renames the existing device to the detected UPS model while preserving assignments, history, credentials, and shutdown relationships.
+
+- [x] **Step 4: Poll failures clear stale online data**
+
+Backend polling now clears `lastStatus`, sets `lastSeen` to null, and stores `nutHealth.state = error` when polling fails. This covers hosts such as `.24` where `upsc -l` can still list a stale configured UPS but no USB UPS is attached.

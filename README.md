@@ -10,7 +10,7 @@ A self-hosted dashboard for UPS monitoring and graceful ordered shutdown. Connec
 
 ```bash
 git clone https://github.com/oculus-pllx/Flux-Controller.git
-cd Flux
+cd Flux-Controller
 cp .env.example .env      # set JWT_SECRET at minimum
 docker compose up -d
 ```
@@ -311,7 +311,9 @@ cd frontend && npm run dev      # :7483 (proxies /api to :5174)
 
 Tests:
 ```bash
-cd backend && npm test          # 111 tests (1 known pre-existing failure)
+cd backend && npm test
+cd flux-agent && npm test
+cd frontend && npm run build
 ```
 
 ---
@@ -326,6 +328,8 @@ cd backend && npm test          # 111 tests (1 known pre-existing failure)
 | NUT discovery returns "No UPS found" | Ensure `upsd` is running; it tries `upsc -l` and multiple config paths |
 | SSH key auth fails | Set `SSH_KEY_DIR` env var to the directory containing your key files |
 | UPS not updating in Power Center | Check `FRONTEND_URL` is correct; NUT credentials may be needed for remote upsd |
+| Replacement UPS reads correctly but old model remains | Use **Manage -> Replace / Re-detect UPS**. Flux restarts NUT, waits for `upsd`, saves the new variables, and renames the device to the detected model. |
+| UPS appears online after being unplugged | The next poll clears stale `lastStatus`, sets `lastSeen` to empty, and shows `nutHealth.state = error` when NUT returns errors such as `DRIVER-NOT-CONNECTED`. |
 | Alert emails not sending | Check SMTP config in Settings; use "Send Test Email" button |
 | Docker UI stale after git pull | `docker compose up -d --build` — must rebuild images |
 | `JWT_SECRET` error on start | Set it in `.env` — required, no default |

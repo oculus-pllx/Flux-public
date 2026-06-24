@@ -6,7 +6,7 @@
 
 ```bash
 git clone https://github.com/oculus-pllx/Flux-Controller.git
-cd Flux
+cd Flux-Controller
 cp .env.example .env        # set JWT_SECRET at minimum
 docker compose up -d
 ```
@@ -74,6 +74,12 @@ From **Power Center**, use **Enable beeper** or **Disable beeper** in the UPS gr
 
 For all available NUT instant commands, open the UPS **Manage** page and use the **Control** tab. Command pills refresh the UPS state after the command completes, so beeper and outlet highlights update from the latest NUT data.
 
+## Replace or Re-detect a UPS
+
+Open the UPS **Manage** dialog and use **Replace / Re-detect UPS** after swapping hardware or repairing the local NUT source.
+
+Flux asks the linked `ups-host` agent to restart the NUT driver/server, waits for `upsd` to accept polls again, reads the full NUT variable set, and saves the detected identity. If the model changes, the existing Flux device is renamed to the detected UPS model while keeping the same device row, assignments, history, credentials, and shutdown relationships.
+
 ---
 
 ## .env Settings
@@ -100,6 +106,8 @@ SSH_KEY_DIR=/etc/flux/keys
 | Agent stuck pending | Delete from Power Center, re-enroll |
 | NUT discovery fails | Ensure `upsd` is running and `LISTEN` is set in `upsd.conf` |
 | No UPS stats showing | Check NUT credentials; verify port 3493 is reachable from Flux server |
+| Re-detect briefly says connection refused | Update the agent/backend. Re-detect now waits through the NUT restart window before polling. |
+| UPS is disconnected but still listed by `upsc -l` | The next Flux poll should clear stale status and show a NUT source error. Check USB cabling and the local NUT driver service on the UPS host. |
 | SSH key auth error | Set `SSH_KEY_DIR` in `.env` |
 | Stale UI after update | `docker compose up -d --build` |
 | Backend crash-looping after update | Schema migration ran automatically on next startup — if you pulled before this fix, run: `docker exec -it flux-backend sqlite3 /app/data/flux.db "ALTER TABLE Devices ADD COLUMN shutdownActive TINYINT(1) DEFAULT 0;"` then `docker restart flux-backend` |

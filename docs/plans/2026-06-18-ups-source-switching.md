@@ -14,9 +14,13 @@ Allow an existing UPS record to keep its Flux identity, assigned machines, histo
 - Restart NUT driver/server services and verify with `upsc`.
 - Roll back the backed-up NUT files when verification fails.
 - Update the existing Flux `Device` row with the discovered NUT endpoint and latest poll result.
+- For the agent-driven **Replace / Re-detect UPS** flow, keep the same Flux device row but save the newly detected NUT variables and rename the device to the detected UPS model.
+- Re-detect waits through the NUT restart window before polling so transient `Connection refused` from `upsd` startup does not fail the workflow.
 
 ## Verification
 
 - Backend route test for `POST /api/devices/:id/source`.
 - SSH service tests for generated SNMP config and missing-sentinel failure.
 - Frontend build verifies the modal wiring.
+- Backend route test for `POST /api/devices/:id/reprobe` verifies identity update on the existing device.
+- Agent tests verify driver restart fallback and `upsc` retry after NUT restarts.
