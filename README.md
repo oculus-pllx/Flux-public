@@ -136,7 +136,8 @@ Each machine row shows `#1 · 0s` — position and delay at a glance.
 - **⚡ UPS HOST** badge — the machine running NUT is highlighted in orange with a bold name
 - **Shutdown order pill** — cyan `#N · Ns` badge on each row shows position and delay
 - **Battery, load, runtime, input voltage** — live stats in each UPS group header
-- **Mute beeper** — one-click if NUT credentials are configured
+- **Enable/Disable beeper** — one-click dashboard control when NUT credentials are configured; prefers persistent `beeper.disable` and falls back to temporary mute when disable is unavailable
+- **Manage commands** — the device **Manage → Control** pills run NUT instant commands and refresh UPS state after the command completes
 
 ---
 
@@ -183,6 +184,15 @@ POST   /api/devices             admin/operator
 POST   /api/devices/discover-nut  SSH-discover NUT config (admin/operator)
 PUT    /api/devices/:id
 DELETE /api/devices/:id
+```
+
+### UPS Control
+```
+GET    /api/devices/:id/control/commands
+POST   /api/devices/:id/control/beeper/toggle  enable/disable from live UPS state
+POST   /api/devices/:id/control/commands/:cmd  run NUT instant command and refresh state
+GET    /api/devices/:id/control/vars/rw
+PUT    /api/devices/:id/control/vars/:varname
 ```
 
 ### Agent Machines

@@ -68,6 +68,14 @@ Or set manually per machine: click machine → **Config tab** → `shutdownOrder
 
 ---
 
+## UPS Controls
+
+From **Power Center**, use **Enable beeper** or **Disable beeper** in the UPS group header. Flux reads the live NUT beeper state first, sends the correct NUT command, then refreshes the UPS status.
+
+For all available NUT instant commands, open the UPS **Manage** page and use the **Control** tab. Command pills refresh the UPS state after the command completes, so beeper and outlet highlights update from the latest NUT data.
+
+---
+
 ## .env Settings
 
 ```env
