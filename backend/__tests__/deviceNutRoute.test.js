@@ -41,12 +41,23 @@ const sshBody = {
 }
 
 // Route runs several SSH probes in parallel; answer by command content
-function mockSsh({ upsNames = '', upsdConf = '', upsdUsers = '', nutPresent = true } = {}) {
+function mockSsh({
+  upsNames = '',
+  configuredUpsNames = '',
+  upsdConf = '',
+  upsdUsers = '',
+  nutPresent = true,
+  usbUpsPresent = false,
+} = {}) {
   sshService.runCommand.mockImplementation((machine, cmd) => {
     if (cmd.includes('FLUX_NUT_PRESENT')) {
       return Promise.resolve(nutPresent ? 'FLUX_NUT_PRESENT' : 'FLUX_NUT_MISSING')
     }
+    if (cmd.includes('FLUX_USB_UPS_PRESENT')) {
+      return Promise.resolve(usbUpsPresent ? 'FLUX_USB_UPS_PRESENT' : 'FLUX_USB_UPS_MISSING')
+    }
     if (cmd.includes('upsc -l')) return Promise.resolve(upsNames)
+    if (cmd.includes('ups.conf')) return Promise.resolve(configuredUpsNames)
     if (cmd.includes('upsd.conf')) return Promise.resolve(upsdConf)
     if (cmd.includes('upsd.users')) return Promise.resolve(upsdUsers)
     return Promise.resolve('')
@@ -70,6 +81,23 @@ describe('POST /api/devices/discover-nut', () => {
     const res = await request(app).post('/api/devices/discover-nut').set(auth).send(sshBody)
     expect(res.status).toBe(422)
     expect(res.body.nutMissing).toBe(false)
+  })
+
+  it('returns repairable when NUT is installed and a USB UPS is connected but not served', async () => {
+    mockSsh({
+      nutPresent: true,
+      usbUpsPresent: true,
+      configuredUpsNames: 'ups\n',
+    })
+
+    const res = await request(app).post('/api/devices/discover-nut').set(auth).send(sshBody)
+
+    expect(res.status).toBe(422)
+    expect(res.body.nutMissing).toBe(false)
+    expect(res.body.repairable).toBe(true)
+    expect(res.body.upsPhysicalPresent).toBe(true)
+    expect(res.body.configuredUpsNames).toEqual(['ups'])
+    expect(res.body.error).toMatch(/configure|repair|serving/i)
   })
 
   it('uses the SSH host when NUT listens on all interfaces', async () => {

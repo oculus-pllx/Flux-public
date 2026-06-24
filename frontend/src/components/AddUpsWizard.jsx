@@ -21,6 +21,7 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
   const [discovering, setDiscovering] = useState(false)
   const [discoverErr, setDiscoverErr] = useState('')
   const [nutMissing,  setNutMissing]  = useState(false)
+  const [repairable,  setRepairable]  = useState(false)
   const [installing,  setInstalling]  = useState(false)
   const [discovered,  setDiscovered]  = useState(null)    // { upsNames, nutHost, nutPort, nutUsername, nutPassword }
   const [saveErr,    setSaveErr]    = useState('')
@@ -75,6 +76,7 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
     e.preventDefault()
     setDiscoverErr('')
     setNutMissing(false)
+    setRepairable(false)
     setDiscovering(true)
     try {
       const { data } = await axios.post('/api/devices/discover-nut', sshPayload(), { headers })
@@ -82,6 +84,7 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
     } catch (err) {
       setDiscoverErr(err.response?.data?.error || err.message || 'Discovery failed')
       setNutMissing(Boolean(err.response?.data?.nutMissing))
+      setRepairable(Boolean(err.response?.data?.repairable))
     } finally {
       setDiscovering(false)
     }
@@ -93,10 +96,12 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
     try {
       const { data } = await axios.post('/api/devices/install-nut', sshPayload(), { headers })
       setNutMissing(false)
+      setRepairable(false)
       applyDiscovered(data)
     } catch (err) {
       setDiscoverErr(err.response?.data?.error || err.message || 'NUT install failed')
       if (!err.response?.data?.installed) setNutMissing(true)
+      setRepairable(Boolean(err.response?.data?.repairable))
     } finally {
       setInstalling(false)
     }
@@ -147,7 +152,7 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
   }
 
   const tabBtn = (id, label) => (
-    <button type="button" onClick={() => { setMode(id); setDiscovered(null); setDiscoverErr('') }}
+    <button type="button" onClick={() => { setMode(id); setDiscovered(null); setDiscoverErr(''); setNutMissing(false); setRepairable(false) }}
       style={{
         flex: 1, padding: '7px', borderRadius: '7px', border: '1px solid var(--flux-border)',
         background: mode === id ? 'var(--flux-accent)' : 'none',
@@ -226,10 +231,12 @@ export default function AddUpsWizard({ headers, onSuccess, onClose }) {
                   </>
                 )}
                 {discoverErr && <p style={{ color: 'var(--flux-critical)', fontSize: '13px', margin: 0 }}>{discoverErr}</p>}
-                {nutMissing && (
+                {(nutMissing || repairable) && (
                   <button type="button" onClick={installNut} disabled={installing || discovering}
                     style={{ background: 'none', border: '1px solid var(--flux-accent)', color: 'var(--flux-accent)', borderRadius: '8px', padding: '10px', fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600, fontSize: '14px', cursor: installing ? 'not-allowed' : 'pointer', opacity: installing ? 0.6 : 1 }}>
-                    {installing ? 'Installing NUT (may take a minute)…' : '⚡ Install & configure NUT on this host'}
+                    {installing
+                      ? repairable ? 'Repairing NUT (may take a minute)…' : 'Installing NUT (may take a minute)…'
+                      : repairable ? 'Configure / Repair NUT on this host' : '⚡ Install & configure NUT on this host'}
                   </button>
                 )}
                 <button type="submit" disabled={discovering || installing}

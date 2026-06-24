@@ -106,6 +106,46 @@ describe('PUT /api/agents/:id', () => {
     expect(m.upsGroupId).toBe(ups.id)
   })
 
+  it('moves a machine to another UPS group and resets UPS-specific settings when requested', async () => {
+    const oldUps = await Device.create({ name: 'Old UPS', host: '10.11.200.23', upsName: 'old' })
+    const newUps = await Device.create({ name: 'New UPS', host: '10.11.200.24', upsName: 'new' })
+    const m = await AgentMachine.create({
+      machineKey: 'move-key',
+      hostname: 'move-host',
+      role: 'pve-node',
+      upsGroupId: oldUps.id,
+      shutdownOrder: 7,
+      shutdownDelay: 90,
+      shutdownTimeout: 240,
+      upsOutlet: 'Bank 2',
+      upsOutletBatteryBacked: false,
+      pveConfig: { node: 'sms-pve-6' },
+      notes: 'keep me',
+    })
+
+    const res = await request(app).put(`/api/agents/${m.id}`).set(auth)
+      .send({ upsGroupId: newUps.id, resetUpsAssignment: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.upsGroupId).toBe(newUps.id)
+    expect(res.body.shutdownOrder).toBe(0)
+    expect(res.body.shutdownDelay).toBe(0)
+    expect(res.body.shutdownTimeout).toBe(120)
+    expect(res.body.upsOutlet).toBeNull()
+    expect(res.body.upsOutletBatteryBacked).toBeNull()
+    expect(res.body.role).toBe('pve-node')
+    expect(res.body.pveConfig).toEqual({ node: 'sms-pve-6' })
+    expect(res.body.notes).toBe('keep me')
+
+    await m.reload()
+    expect(m.upsGroupId).toBe(newUps.id)
+    expect(m.shutdownOrder).toBe(0)
+    expect(m.shutdownDelay).toBe(0)
+    expect(m.shutdownTimeout).toBe(120)
+    expect(m.upsOutlet).toBeNull()
+    expect(m.upsOutletBatteryBacked).toBeNull()
+  })
+
   it('updates cluster metadata from the machine detail form', async () => {
     const m = await AgentMachine.create({
       machineKey: 'cluster-key',

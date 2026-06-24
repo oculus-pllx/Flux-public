@@ -103,7 +103,9 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
     setSaving(true)
     setError('')
     try {
+      const selected = candidates.find(machine => String(machine.id) === String(machineId))
       const payload = { upsGroupId: device.id }
+      if (selected?.upsGroupId && selected.upsGroupId !== device.id) payload.resetUpsAssignment = true
       if (asUpsHost) payload.role = 'ups-host'
       const { data } = await axios.put(`/api/agents/${machineId}`, payload, { headers })
       if (asUpsHost && data.machineKey) {
@@ -618,9 +620,79 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
   )
 }
 
+function MoveUpsButton({ machine, devices = [], headers, onMoved }) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const targets = devices
+    .filter(device => device.id !== machine.upsGroupId)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
+  async function move(deviceId) {
+    if (!deviceId) return
+    setSaving(true)
+    try {
+      await axios.put(`/api/agents/${machine.id}`, {
+        upsGroupId: Number(deviceId),
+        resetUpsAssignment: true,
+      }, { headers })
+      setOpen(false)
+      onMoved()
+    } catch {}
+    finally { setSaving(false) }
+  }
+
+  if (targets.length === 0) return null
+
+  if (!open) {
+    return (
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(true) }}
+        title="Move this machine to another UPS and reset UPS-specific shutdown settings"
+        style={{
+          background: 'none',
+          border: '1px solid var(--flux-border)',
+          color: 'var(--flux-muted)',
+          borderRadius: 4,
+          fontSize: 10,
+          padding: '2px 6px',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}>
+        Move UPS
+      </button>
+    )
+  }
+
+  return (
+    <select
+      autoFocus
+      disabled={saving}
+      defaultValue=""
+      onClick={e => e.stopPropagation()}
+      onChange={e => move(e.target.value)}
+      onBlur={() => { if (!saving) setOpen(false) }}
+      style={{
+        background: 'var(--flux-panel)',
+        border: '1px solid var(--flux-accent)',
+        color: 'var(--flux-text)',
+        fontSize: 10,
+        padding: '2px 6px',
+        borderRadius: 4,
+        cursor: saving ? 'not-allowed' : 'pointer',
+        fontFamily: 'monospace',
+        maxWidth: 180,
+      }}>
+      <option value="" disabled>{saving ? 'Moving...' : 'Move to UPS'}</option>
+      {targets.map(device => (
+        <option key={device.id} value={device.id}>{device.name || device.upsName}</option>
+      ))}
+    </select>
+  )
+}
+
 // ── Machine Row ───────────────────────────────────────────────────────────────
 
-function MachineRow({ machine, canWrite = false, headers, onRefresh }) {
+function MachineRow({ machine, canWrite = false, headers, onRefresh, devices = [] }) {
   const navigate = useNavigate()
   const [editingOrder, setEditingOrder] = useState(false)
   const [order, setOrder] = useState(String(machine.shutdownOrder || 0))
@@ -770,6 +842,14 @@ function MachineRow({ machine, canWrite = false, headers, onRefresh }) {
             style={{ background: 'none', border: '1px solid var(--flux-border)', color: 'var(--flux-muted)', borderRadius: 4, fontSize: 10, padding: '2px 6px', cursor: 'pointer' }}>
             Order
           </button>
+        )}
+        {canWrite && machine.upsGroupId && !editingOrder && (
+          <MoveUpsButton
+            machine={machine}
+            devices={devices}
+            headers={headers}
+            onMoved={onRefresh}
+          />
         )}
         <span style={{
           fontFamily: 'monospace', fontSize: 11, fontWeight: 500,
@@ -1182,7 +1262,7 @@ export default function PowerCenter() {
                     No machines assigned to this UPS
                   </div>
                 ) : (
-                  machines.map(m => <MachineRow key={m.id} machine={m} canWrite={canWrite} headers={headers} onRefresh={load} />)
+                  machines.map(m => <MachineRow key={m.id} machine={m} canWrite={canWrite} headers={headers} onRefresh={load} devices={devices} />)
                 )}
               </div>
             </div>

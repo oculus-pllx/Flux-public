@@ -141,6 +141,13 @@ router.put('/:id', requireRole('admin', 'operator'), async (req, res, next) => {
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) updates[key] = req.body[key]
     }
+    if (req.body.resetUpsAssignment === true && Object.prototype.hasOwnProperty.call(updates, 'upsGroupId')) {
+      updates.shutdownOrder = 0
+      updates.shutdownDelay = 0
+      updates.shutdownTimeout = 120
+      updates.upsOutlet = null
+      updates.upsOutletBatteryBacked = null
+    }
     if (updates.role !== undefined && !AgentMachine.VALID_ROLES.includes(updates.role)) {
       return res.status(400).json({ error: `role must be one of: ${AgentMachine.VALID_ROLES.join(', ')}` })
     }

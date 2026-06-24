@@ -90,27 +90,39 @@ function variableSummary(before = {}, after = {}) {
   }
 }
 
-// Read NUT config from a remote host over SSH. Throws a 422 error with
-// `payload.nutMissing` when no UPS is found so callers can offer an install.
+// Read NUT config from a remote host over SSH. A live `upsc -l` result is
+// required for success; static ups.conf stanzas are diagnostics only.
 async function discoverNut(machine) {
   const sshService = require('../services/sshService')
 
   const NUT_DIRS = '/etc/nut /etc/ups /usr/local/etc/nut'
-  const [namesRaw, upsdConf, upsdUsers, nutCheck] = await Promise.all([
-    sshService.runCommand(machine, `upsc -l 2>/dev/null; for d in ${NUT_DIRS}; do [ -f "$d/ups.conf" ] && grep -oE '^\\[[^]]+\\]' "$d/ups.conf" 2>/dev/null | tr -d '[]'; done; true`),
+  const parseUpsNames = raw => [...new Set(String(raw || '').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')))]
+  const [liveNamesRaw, configNamesRaw, upsdConf, upsdUsers, nutCheck, usbCheck] = await Promise.all([
+    sshService.runCommand(machine, `upsc -l 2>/dev/null || true`),
+    sshService.runCommand(machine, `for d in ${NUT_DIRS}; do [ -f "$d/ups.conf" ] && grep -oE '^\\[[^]]+\\]' "$d/ups.conf" 2>/dev/null | tr -d '[]'; done; true`),
     sshService.runCommand(machine, `for d in ${NUT_DIRS}; do [ -f "$d/upsd.conf" ] && cat "$d/upsd.conf" 2>/dev/null && break; done; true`),
     sshService.runCommand(machine, `for d in ${NUT_DIRS}; do [ -f "$d/upsd.users" ] && cat "$d/upsd.users" 2>/dev/null && break; done; true`),
     sshService.runCommand(machine, `(command -v upsd || command -v upsc || command -v upsdrvctl) >/dev/null 2>&1 && echo FLUX_NUT_PRESENT || echo FLUX_NUT_MISSING`),
+    sshService.runCommand(machine, `lsusb 2>/dev/null | grep -Eiq '(051d|0463|09ae|0764|050d)' && echo FLUX_USB_UPS_PRESENT || echo FLUX_USB_UPS_MISSING`),
   ])
 
-  const upsNames = [...new Set(namesRaw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')))]
+  const upsNames = parseUpsNames(liveNamesRaw)
   if (upsNames.length === 0) {
     const nutMissing = nutCheck.includes('FLUX_NUT_MISSING')
+    const upsPhysicalPresent = usbCheck.includes('FLUX_USB_UPS_PRESENT')
+    const repairable = !nutMissing && upsPhysicalPresent
     const err = new Error(nutMissing
       ? 'NUT is not installed on this host. Flux can install and configure it over SSH.'
-      : 'No UPS found. Tried upsc -l and ups.conf in /etc/nut, /etc/ups, /usr/local/etc/nut. Is the NUT service running?')
+      : repairable
+        ? 'NUT is installed but not serving the connected UPS. Flux can configure or repair NUT on this host.'
+        : 'No live UPS found from upsc -l. Is a UPS connected and is the NUT service running?')
     err.status = 422
-    err.payload = { nutMissing }
+    err.payload = {
+      nutMissing,
+      repairable,
+      upsPhysicalPresent,
+      configuredUpsNames: parseUpsNames(configNamesRaw),
+    }
     throw err
   }
 
