@@ -298,17 +298,18 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
   const voltage = v['input.voltage']
   const beeper  = v['ups.beeper.status']
 
-  async function muteBeeper() {
+  async function silenceBeeper() {
     setMutePhase('busy')
     setMuteMsg('')
     try {
-      await axios.post(
-        `/api/devices/${device.id}/control/commands/beeper.mute`,
+      const res = await axios.post(
+        `/api/devices/${device.id}/control/beeper/silence`,
         {},
         { headers }
       )
+      const command = res.data?.command
       setMutePhase('ok')
-      setMuteMsg('✓ Muted')
+      setMuteMsg(command === 'beeper.disable' ? '✓ Disabled' : '✓ Muted')
       setTimeout(() => { setMutePhase('idle'); setMuteMsg('') }, 3000)
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed'
@@ -398,12 +399,12 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
           )}
           {canWrite && (
             <button
-              onClick={muteBeeper}
+              onClick={silenceBeeper}
               disabled={mutePhase === 'busy' || mutePhase === 'ok' || !device.hasNutCredentials}
               title={
                 !device.hasNutCredentials
                   ? 'NUT credentials required — configure in Device Settings'
-                  : 'Mute beeper (30–60s)'
+                  : 'Disable beeper when supported, otherwise send temporary mute'
               }
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -415,7 +416,7 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
                 cursor: (mutePhase === 'busy' || mutePhase === 'ok' || !device.hasNutCredentials) ? 'not-allowed' : 'pointer',
                 opacity: !device.hasNutCredentials ? 0.4 : 1,
               }}>
-              {mutePhase === 'busy' ? 'Muting…' : mutePhase === 'ok' ? '✓ Muted' : '🔕 Mute beeper'}
+              {mutePhase === 'busy' ? 'Silencing…' : mutePhase === 'ok' ? muteMsg : '🔕 Silence beeper'}
             </button>
           )}
           {canWrite && machines && machines.length > 0 && (
