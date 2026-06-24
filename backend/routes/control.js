@@ -40,9 +40,37 @@ async function runPreferredBeeperSilenceCommand(client, upsName) {
   return command
 }
 
-async function runBeeperToggleCommand(client, device) {
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+function expectedBeeperStatus(command) {
+  if (command === 'beeper.enable') return 'enabled'
+  if (command === 'beeper.disable') return 'disabled'
+  return null
+}
+
+async function pollDeviceStatus(device) {
+  return pollDevice(
+    device.host,
+    device.port,
+    device.upsName,
+    device.nutUsername,
+    device.nutPassword
+  )
+}
+
+async function pollUntilBeeperStatus(device, expectedStatus, { attempts = 6, delayMs = 250 } = {}) {
+  let status = null
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await sleep(delayMs)
+    status = await pollDeviceStatus(device)
+    if (!expectedStatus || status['ups.beeper.status'] === expectedStatus) return status
+  }
+  return status
+}
+
+async function runBeeperToggleCommand(client, device, currentStatus = {}) {
   const commands = await client.listCommands(device.upsName)
-  const isDisabled = device.lastStatus?.['ups.beeper.status'] === 'disabled'
+  const isDisabled = currentStatus['ups.beeper.status'] === 'disabled'
 
   if (isDisabled) {
     if (!commands.includes('beeper.enable')) {
@@ -106,14 +134,9 @@ router.post('/beeper/toggle', requireRole('admin', 'operator'), async (req, res,
     if (!device) return res.status(404).json({ error: 'Not found' })
     if (!requireNutCredentials(device, res)) return
     const client = getClient(device)
-    const command = await runBeeperToggleCommand(client, device)
-    const status = await pollDevice(
-      device.host,
-      device.port,
-      device.upsName,
-      device.nutUsername,
-      device.nutPassword
-    )
+    const currentStatus = await pollDeviceStatus(device)
+    const command = await runBeeperToggleCommand(client, device, currentStatus)
+    const status = await pollUntilBeeperStatus(device, expectedBeeperStatus(command))
     await device.update({ lastStatus: status, lastSeen: new Date() })
     res.json({ ok: true, command, device: sanitizeDevice(device) })
   } catch (err) {

@@ -121,7 +121,9 @@ describe('POST /api/devices/:id/control/beeper/toggle', () => {
     const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'disabled' } })
     mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
     mockClient.runCommand.mockResolvedValue(true)
-    nutService.pollDevice.mockResolvedValue({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
+    nutService.pollDevice
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
 
     const res = await request(app)
       .post(`/api/devices/${device.id}/control/beeper/toggle`)
@@ -148,7 +150,9 @@ describe('POST /api/devices/:id/control/beeper/toggle', () => {
     const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'enabled' } })
     mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
     mockClient.runCommand.mockResolvedValue(true)
-    nutService.pollDevice.mockResolvedValue({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
+    nutService.pollDevice
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
 
     const res = await request(app)
       .post(`/api/devices/${device.id}/control/beeper/toggle`)
@@ -165,5 +169,42 @@ describe('POST /api/devices/:id/control/beeper/toggle', () => {
       },
     })
     expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.disable')
+  })
+
+  it('uses live UPS state instead of stale saved beeper state', async () => {
+    const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'disabled' } })
+    mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
+    mockClient.runCommand.mockResolvedValue(true)
+    nutService.pollDevice
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/control/beeper/toggle`)
+      .set(adminAuth)
+
+    expect(res.status).toBe(200)
+    expect(res.body.command).toBe('beeper.disable')
+    expect(res.body.device.lastStatus['ups.beeper.status']).toBe('disabled')
+    expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.disable')
+  })
+
+  it('waits for NUT to report the expected beeper state after the command', async () => {
+    const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'disabled' } })
+    mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
+    mockClient.runCommand.mockResolvedValue(true)
+    nutService.pollDevice
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
+      .mockResolvedValueOnce({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/control/beeper/toggle`)
+      .set(adminAuth)
+
+    expect(res.status).toBe(200)
+    expect(res.body.command).toBe('beeper.enable')
+    expect(res.body.device.lastStatus['ups.beeper.status']).toBe('enabled')
+    expect(nutService.pollDevice).toHaveBeenCalledTimes(3)
   })
 })
