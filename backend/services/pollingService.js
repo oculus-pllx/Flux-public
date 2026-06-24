@@ -36,6 +36,18 @@ async function pollDevice(device) {
     broadcast(device.id, data, lastSeen)
   } catch (err) {
     console.error(`Poll failed for device ${device.id} (${device.host}):`, err.message)
+    await device.update({
+      lastSeen: null,
+      lastStatus: {},
+      nutHealth: {
+        state: 'error',
+        sourceType: 'unknown',
+        message: `NUT polling failed: ${err.message}`,
+        checkedAt: new Date().toISOString(),
+        checks: { upscReachable: false },
+      },
+    })
+    broadcast(device.id, {}, null)
   }
 }
 
@@ -130,4 +142,4 @@ function stopDevice(deviceId) {
   }
 }
 
-module.exports = { startPolling, scheduleDevice, stopDevice, sseClients, checkAutoShutdownForTest: checkAutoShutdown }
+module.exports = { startPolling, scheduleDevice, stopDevice, sseClients, checkAutoShutdownForTest: checkAutoShutdown, pollDeviceForTest: pollDevice }

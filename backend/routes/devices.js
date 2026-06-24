@@ -321,11 +321,14 @@ router.post('/:id/reprobe', requireRole('admin', 'operator'), async (req, res, n
 
     const before = device.lastStatus || {}
     const after = response.upsVars || {}
-    await device.update({
+    const afterIdentity = upsIdentity(after)
+    const update = {
       lastStatus: after,
       lastSeen: new Date(),
       nutHealth: response.nutHealth || null,
-    })
+    }
+    if (afterIdentity.model) update.name = afterIdentity.model
+    await device.update(update)
     pollingService.scheduleDevice(device)
 
     res.json({
@@ -333,7 +336,7 @@ router.post('/:id/reprobe', requireRole('admin', 'operator'), async (req, res, n
       restarted: response.restarted === true,
       identity: {
         before: upsIdentity(before),
-        after: upsIdentity(after),
+        after: afterIdentity,
       },
       variables: variableSummary(before, after),
       device: sanitizeDevice(device),

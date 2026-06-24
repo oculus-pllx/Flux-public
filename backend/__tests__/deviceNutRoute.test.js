@@ -247,7 +247,7 @@ describe('POST /api/devices/:id/source', () => {
 describe('POST /api/devices/:id/reprobe', () => {
   it('asks the linked UPS-host agent to restart NUT and saves all returned variables', async () => {
     const device = await Device.create({
-      name: 'Rack UPS',
+      name: 'Smart-UPS 2200',
       host: '10.11.200.23',
       port: 3493,
       upsName: 'apc2200',
@@ -308,10 +308,12 @@ describe('POST /api/devices/:id/reprobe', () => {
     expect(res.body.identity.after).toMatchObject({ model: 'Smart-UPS 1500', serial: 'NEW1500' })
     expect(res.body.variables.added).toEqual(['input.voltage', 'output.voltage', 'ups.load'])
     expect(res.body.variables.count).toBe(7)
+    expect(res.body.device.name).toBe('Smart-UPS 1500')
     expect(res.body.device.lastStatus).toMatchObject(upsVars)
     expect(res.body.device.nutHealth).toEqual(nutHealth)
 
     await device.reload()
+    expect(device.name).toBe('Smart-UPS 1500')
     expect(device.lastStatus).toEqual(upsVars)
     expect(device.nutHealth).toEqual(nutHealth)
   })
