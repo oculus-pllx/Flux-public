@@ -134,6 +134,19 @@ describe('nut service', () => {
       expect(mockExec).toHaveBeenNthCalledWith(1, "systemctl restart 'nut-driver@myups'", expect.any(Function))
       expect(mockExec).toHaveBeenNthCalledWith(2, 'systemctl restart nut-server', expect.any(Function))
     })
+
+    it('falls back to upsdrvctl when the systemd driver restart fails', async () => {
+      setupExec(new Error('driver restart failed'))
+      setupExec(null, '')
+      setupExec(null, '')
+
+      const { restartServices } = require('../services/nut')
+      await restartServices('myups')
+
+      expect(mockExec).toHaveBeenNthCalledWith(1, "systemctl restart 'nut-driver@myups'", expect.any(Function))
+      expect(mockExec).toHaveBeenNthCalledWith(2, "upsdrvctl start 'myups'", expect.any(Function))
+      expect(mockExec).toHaveBeenNthCalledWith(3, 'systemctl restart nut-server', expect.any(Function))
+    })
   })
 
   describe('checkHealth', () => {

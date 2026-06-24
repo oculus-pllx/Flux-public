@@ -88,7 +88,13 @@ async function restartNut() {
 }
 
 async function restartServices(upsName) {
-  if (upsName) await run(`systemctl restart ${shellQuote(`nut-driver@${upsName}`)}`)
+  if (upsName) {
+    try {
+      await run(`systemctl restart ${shellQuote(`nut-driver@${upsName}`)}`)
+    } catch {
+      await run(`upsdrvctl start ${shellQuote(upsName)}`)
+    }
+  }
   await restartNut()
 }
 
