@@ -58,7 +58,7 @@ async function pollDeviceStatus(device) {
   )
 }
 
-async function pollUntilBeeperStatus(device, expectedStatus, { attempts = 6, delayMs = 250 } = {}) {
+async function pollUntilBeeperStatus(device, expectedStatus, { attempts = 8, delayMs = 500 } = {}) {
   let status = null
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) await sleep(delayMs)
