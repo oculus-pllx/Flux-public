@@ -65,6 +65,8 @@ Run: `cd backend && npm test`
 
 Run: `cd frontend && npm run build`
 
-- [ ] **Step 3: Commit, mirror to private repo, deploy**
+- [x] **Step 3: Commit, mirror to private repo, deploy**
 
 Commit public and private repos, rebuild Docker prod, and deploy native backend if needed.
+
+Result: public `42bfc23` and private `475d08b` were pushed. Native `.135` was updated in `/opt/flux`, restarted, and returned `/api/health` OK. Docker `.25` was fast-forwarded, rebuilt with `docker compose up -d --build`, and backend health returned OK.
