@@ -297,19 +297,20 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
   const runtime = v['battery.runtime']
   const voltage = v['input.voltage']
   const beeper  = v['ups.beeper.status']
+  const beeperDisabled = beeper === 'disabled'
 
-  async function silenceBeeper() {
+  async function toggleBeeper() {
     setMutePhase('busy')
     setMuteMsg('')
     try {
       const res = await axios.post(
-        `/api/devices/${device.id}/control/beeper/silence`,
+        `/api/devices/${device.id}/control/beeper/toggle`,
         {},
         { headers }
       )
       const command = res.data?.command
       setMutePhase('ok')
-      setMuteMsg(command === 'beeper.disable' ? '✓ Disabled' : '✓ Muted')
+      setMuteMsg(command === 'beeper.enable' ? '✓ Enabled' : command === 'beeper.disable' ? '✓ Disabled' : '✓ Muted')
       setTimeout(() => { setMutePhase('idle'); setMuteMsg('') }, 3000)
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed'
@@ -399,12 +400,14 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
           )}
           {canWrite && (
             <button
-              onClick={silenceBeeper}
+              onClick={toggleBeeper}
               disabled={mutePhase === 'busy' || mutePhase === 'ok' || !device.hasNutCredentials}
               title={
                 !device.hasNutCredentials
                   ? 'NUT credentials required — configure in Device Settings'
-                  : 'Disable beeper when supported, otherwise send temporary mute'
+                  : beeperDisabled
+                    ? 'Enable the UPS beeper'
+                    : 'Disable beeper when supported, otherwise send temporary mute'
               }
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -416,7 +419,13 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
                 cursor: (mutePhase === 'busy' || mutePhase === 'ok' || !device.hasNutCredentials) ? 'not-allowed' : 'pointer',
                 opacity: !device.hasNutCredentials ? 0.4 : 1,
               }}>
-              {mutePhase === 'busy' ? 'Silencing…' : mutePhase === 'ok' ? muteMsg : '🔕 Silence beeper'}
+              {mutePhase === 'busy'
+                ? (beeperDisabled ? 'Enabling…' : 'Silencing…')
+                : mutePhase === 'ok'
+                  ? muteMsg
+                  : beeperDisabled
+                    ? '🔔 Enable beeper'
+                    : '🔕 Silence beeper'}
             </button>
           )}
           {canWrite && machines && machines.length > 0 && (

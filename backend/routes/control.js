@@ -33,6 +33,36 @@ async function runPreferredBeeperSilenceCommand(client, upsName) {
   return command
 }
 
+async function runBeeperToggleCommand(client, device) {
+  const commands = await client.listCommands(device.upsName)
+  const isDisabled = device.lastStatus?.['ups.beeper.status'] === 'disabled'
+
+  if (isDisabled) {
+    if (!commands.includes('beeper.enable')) {
+      const err = new Error('This UPS does not expose beeper.enable via NUT.')
+      err.status = 422
+      throw err
+    }
+    await client.runCommand(device.upsName, 'beeper.enable')
+    return 'beeper.enable'
+  }
+
+  const command = commands.includes('beeper.disable')
+    ? 'beeper.disable'
+    : commands.includes('beeper.mute')
+      ? 'beeper.mute'
+      : null
+
+  if (!command) {
+    const err = new Error('This UPS does not expose beeper.disable or beeper.mute via NUT.')
+    err.status = 422
+    throw err
+  }
+
+  await client.runCommand(device.upsName, command)
+  return command
+}
+
 // List available INSTCMD commands
 router.get('/commands', async (req, res, next) => {
   try {
@@ -54,6 +84,22 @@ router.post('/beeper/silence', requireRole('admin', 'operator'), async (req, res
     if (!requireNutCredentials(device, res)) return
     const client = getClient(device)
     const command = await runPreferredBeeperSilenceCommand(client, device.upsName)
+    res.json({ ok: true, command })
+  } catch (err) {
+    if (err.status === 422) return res.status(422).json({ error: err.message })
+    next(err)
+  }
+})
+
+// Toggle the beeper from the current NUT-reported state. Disabled UPSs are
+// re-enabled; anything else is silenced with the best available command.
+router.post('/beeper/toggle', requireRole('admin', 'operator'), async (req, res, next) => {
+  try {
+    const device = await Device.findByPk(req.params.id)
+    if (!device) return res.status(404).json({ error: 'Not found' })
+    if (!requireNutCredentials(device, res)) return
+    const client = getClient(device)
+    const command = await runBeeperToggleCommand(client, device)
     res.json({ ok: true, command })
   } catch (err) {
     if (err.status === 422) return res.status(422).json({ error: err.message })

@@ -113,3 +113,33 @@ describe('POST /api/devices/:id/control/beeper/silence', () => {
     expect(mockClient.runCommand).not.toHaveBeenCalled()
   })
 })
+
+describe('POST /api/devices/:id/control/beeper/toggle', () => {
+  it('enables the beeper when the saved UPS status is disabled', async () => {
+    const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'disabled' } })
+    mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
+    mockClient.runCommand.mockResolvedValue(true)
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/control/beeper/toggle`)
+      .set(adminAuth)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, command: 'beeper.enable' })
+    expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.enable')
+  })
+
+  it('silences the beeper when the saved UPS status is not disabled', async () => {
+    const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'enabled' } })
+    mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
+    mockClient.runCommand.mockResolvedValue(true)
+
+    const res = await request(app)
+      .post(`/api/devices/${device.id}/control/beeper/toggle`)
+      .set(adminAuth)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, command: 'beeper.disable' })
+    expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.disable')
+  })
+})
