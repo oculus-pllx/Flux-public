@@ -1,7 +1,7 @@
 const router = require('express').Router({ mergeParams: true })
 const { authenticate, requireRole } = require('../middleware/auth')
 const Device = require('../models/Device')
-const { getClient } = require('../services/nutService')
+const { getClient, pollDevice } = require('../services/nutService')
 
 router.use(authenticate)
 
@@ -13,6 +13,13 @@ function requireNutCredentials(device, res) {
     return false
   }
   return true
+}
+
+function sanitizeDevice(device) {
+  const obj = device.toJSON()
+  delete obj.nutPassword
+  obj.hasNutCredentials = Boolean(device.nutUsername && device.nutPassword)
+  return obj
 }
 
 async function runPreferredBeeperSilenceCommand(client, upsName) {
@@ -100,7 +107,15 @@ router.post('/beeper/toggle', requireRole('admin', 'operator'), async (req, res,
     if (!requireNutCredentials(device, res)) return
     const client = getClient(device)
     const command = await runBeeperToggleCommand(client, device)
-    res.json({ ok: true, command })
+    const status = await pollDevice(
+      device.host,
+      device.port,
+      device.upsName,
+      device.nutUsername,
+      device.nutPassword
+    )
+    await device.update({ lastStatus: status, lastSeen: new Date() })
+    res.json({ ok: true, command, device: sanitizeDevice(device) })
   } catch (err) {
     if (err.status === 422) return res.status(422).json({ error: err.message })
     next(err)

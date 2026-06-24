@@ -8,6 +8,7 @@ const mockClient = {
 
 jest.mock('../services/nutService', () => ({
   getClient: jest.fn(() => mockClient),
+  pollDevice: jest.fn(),
 }))
 
 const request = require('supertest')
@@ -15,6 +16,7 @@ const express = require('express')
 const jwt = require('jsonwebtoken')
 const { sequelize } = require('../config/database')
 const Device = require('../models/Device')
+const nutService = require('../services/nutService')
 
 const app = express()
 app.use(express.json())
@@ -119,27 +121,49 @@ describe('POST /api/devices/:id/control/beeper/toggle', () => {
     const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'disabled' } })
     mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
     mockClient.runCommand.mockResolvedValue(true)
+    nutService.pollDevice.mockResolvedValue({ 'ups.beeper.status': 'enabled', 'ups.status': 'OL' })
 
     const res = await request(app)
       .post(`/api/devices/${device.id}/control/beeper/toggle`)
       .set(adminAuth)
 
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ ok: true, command: 'beeper.enable' })
+    expect(res.body).toMatchObject({
+      ok: true,
+      command: 'beeper.enable',
+      device: {
+        id: device.id,
+        lastStatus: { 'ups.beeper.status': 'enabled', 'ups.status': 'OL' },
+        hasNutCredentials: true,
+      },
+    })
     expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.enable')
+    expect(nutService.pollDevice).toHaveBeenCalledWith('10.11.200.24', 3493, 'ups', 'fluxmon', 'secret')
+
+    await device.reload()
+    expect(device.lastStatus['ups.beeper.status']).toBe('enabled')
   })
 
   it('silences the beeper when the saved UPS status is not disabled', async () => {
     const device = await createDevice({ lastStatus: { 'ups.beeper.status': 'enabled' } })
     mockClient.listCommands.mockResolvedValue(['beeper.enable', 'beeper.disable'])
     mockClient.runCommand.mockResolvedValue(true)
+    nutService.pollDevice.mockResolvedValue({ 'ups.beeper.status': 'disabled', 'ups.status': 'OL' })
 
     const res = await request(app)
       .post(`/api/devices/${device.id}/control/beeper/toggle`)
       .set(adminAuth)
 
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ ok: true, command: 'beeper.disable' })
+    expect(res.body).toMatchObject({
+      ok: true,
+      command: 'beeper.disable',
+      device: {
+        id: device.id,
+        lastStatus: { 'ups.beeper.status': 'disabled', 'ups.status': 'OL' },
+        hasNutCredentials: true,
+      },
+    })
     expect(mockClient.runCommand).toHaveBeenCalledWith('ups', 'beeper.disable')
   })
 })

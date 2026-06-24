@@ -237,7 +237,7 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
   )
 }
 
-function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, onRefresh, onEdit }) {
+function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, onRefresh, onDeviceUpdated, onEdit }) {
   const navigate = useNavigate()
   const [mutePhase,   setMutePhase]   = useState('idle')
   const [muteMsg,     setMuteMsg]     = useState('')
@@ -309,8 +309,10 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
         { headers }
       )
       const command = res.data?.command
+      if (res.data?.device) onDeviceUpdated(res.data.device)
       setMutePhase('ok')
       setMuteMsg(command === 'beeper.enable' ? '✓ Enabled' : command === 'beeper.disable' ? '✓ Disabled' : '✓ Muted')
+      onRefresh()
       setTimeout(() => { setMutePhase('idle'); setMuteMsg('') }, 3000)
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed'
@@ -1068,6 +1070,12 @@ export default function PowerCenter() {
     }
   }, [headers])
 
+  const updateDevice = useCallback((updatedDevice) => {
+    setDevices(current => current.map(device => (
+      device.id === updatedDevice.id ? updatedDevice : device
+    )))
+  }, [])
+
   useEffect(() => {
     load()
     const iv = setInterval(load, 10_000)
@@ -1159,6 +1167,7 @@ export default function PowerCenter() {
                 machines={machines}
                 allAgents={agents}
                 onRefresh={load}
+                onDeviceUpdated={updateDevice}
                 onEdit={() => setEditUps(device)}
               />
 
