@@ -38,8 +38,9 @@ The HA/PBS controls are code-complete but configuration-dependent. They only run
 - PBS job abort requires the PBS agent to have valid `pbsConfig`.
 
 Live `.135` now has PVE/PBS API configs saved and pushed to agents. Read-only
-API verification passes from the agents themselves. Destructive execution of HA
-freeze, guest shutdown, and PBS job abort is still intentionally untested.
+API verification passes from the agents themselves. `sms-pbs` is assigned to
+UPS group 8 (`PVE-6-1500`). Destructive execution of HA freeze, guest shutdown,
+and PBS job abort is still intentionally untested.
 
 ## Next Concrete Tasks
 
@@ -49,7 +50,7 @@ freeze, guest shutdown, and PBS job abort is still intentionally untested.
 - [x] On `.135`, add or verify `pbsConfig` on the PBS machine so running backup jobs are aborted before shutdown.
 - [x] Push updated machine configs to connected agents after editing `pveConfig`, `pbsConfig`, or `nutConfig`.
 - [x] Push updated cluster metadata to connected PVE agents after editing `clusterId`.
-- [x] Run a non-destructive dry run or controlled simulation that proves the shutdown sequence emits the expected steps without relying on a real low-battery event.
+- [ ] Run a non-destructive dry run or controlled simulation that proves the shutdown sequence emits the expected steps without relying on a real low-battery event.
 - [x] Confirm the UPS host still reports `apc2200` over NUT and remains assigned to the UPS as `ups-host`.
 - [x] Confirm UPS controls still work: beeper enable/disable, mute, and any available APC instant commands supported by NUT for this model.
 - [x] Check whether load and input voltage fields are absent from the APC/NUT data or just not surfaced in the UI.
@@ -69,6 +70,8 @@ freeze, guest shutdown, and PBS job abort is still intentionally untested.
 - Both READMEs now document PBS before PVE in auto-order: `controlled -> pbs -> pve-node -> ups-host`.
 - `docs/QUICKSTART.md` documents the Replace / Re-detect UPS workflow and offline NUT source behavior.
 - `docs/plans/2026-06-24-nut-source-health.md` records full verification/deploy completion for the NUT source health and reprobe fixes.
+- `docs/ops/2026-06-25-live-proxmox-pbs-shutdown-config.md` records the live Proxmox/PBS orchestration config without token secrets.
+- `docs/specs/2026-06-25-central-proxmox-pbs-settings-design.md` records the recommended future central settings model.
 
 ## Relevant Files
 

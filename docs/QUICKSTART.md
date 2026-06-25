@@ -68,6 +68,24 @@ Or set manually per machine: click machine → **Config tab** → `shutdownOrder
 
 ---
 
+## Configure Proxmox / PBS Shutdown
+
+For Proxmox HA and PBS handling to run during a UPS shutdown, roles alone are not enough.
+
+- Set the same `clusterId` on every PVE node in the same cluster.
+- Set `pveConfig` on every PVE node that should enable maintenance and stop local guests before host shutdown.
+- Set `pbsConfig` on PBS machines that should abort running backup tasks before shutdown.
+- Assign each PVE/PBS machine to the UPS group that physically powers it.
+- Push config to online agents after editing, or restart agents after updating `/etc/flux-agent/config.json`.
+
+Current behavior starts shutdown orchestration on `OB LB`, not `OB` alone.
+
+The live SMS production reference is in `docs/ops/2026-06-25-live-proxmox-pbs-shutdown-config.md`.
+
+Longer-term, the cleaner design is a central **Proxmox/PBS Settings** page that stores cluster and PBS tokens once and applies node-specific config automatically. See `docs/specs/2026-06-25-central-proxmox-pbs-settings-design.md`.
+
+---
+
 ## UPS Controls
 
 From **Power Center**, use **Enable beeper** or **Disable beeper** in the UPS group header. Flux reads the live NUT beeper state first, sends the correct NUT command, then refreshes the UPS status.

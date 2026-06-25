@@ -141,6 +141,26 @@ Each machine row shows `#1 · 0s` — position and delay at a glance.
 
 ---
 
+## Proxmox / PBS Shutdown Configuration
+
+Flux can coordinate Proxmox and PBS during UPS shutdowns, but this is configuration-dependent.
+
+Current model:
+- PVE nodes need a `clusterId` shared by every node in the same Proxmox cluster.
+- Every PVE node that should stop its local VMs/CTs needs `pveConfig`: PVE API URL, API token ID/secret, and the exact node name.
+- At least one online `pve-node` in each cluster needs valid `pveConfig` so Flux can set cluster HA shutdown policy to freeze before schedules are sent.
+- PBS machines need role `pbs`, a UPS assignment, and `pbsConfig`: PBS API URL, API token ID/secret, job abort timeout, and force-shutdown preference.
+- After editing config in Flux, push config to the connected agent so `/etc/flux-agent/config.json` matches the database.
+
+Recommended future model:
+- A single **Proxmox Settings** page should store cluster-level defaults once: cluster ID, API token, default API host, HA freeze timeout, and PBS endpoint/token.
+- Flux should discover nodes from the cluster API and fan out node-specific `pveConfig.node` values to matching agents automatically.
+- Per-machine PVE/PBS config should remain available only as an override for unusual nodes or multiple clusters.
+
+Live production reference for the current SMS cluster is documented in `docs/ops/2026-06-25-live-proxmox-pbs-shutdown-config.md`.
+
+---
+
 ## Configuration
 
 `.env` at the project root (Docker) or `backend/.env` (dev):
