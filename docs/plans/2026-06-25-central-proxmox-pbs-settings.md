@@ -200,19 +200,19 @@ git commit -m "feat: add proxmox pbs settings UI"
 **Files:**
 - Modify: `HANDOFF.md`
 
-- [ ] **Step 1: Run backend tests**
+- [x] **Step 1: Run backend tests**
 
 Run: `cd backend && npm test`
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend build**
+- [x] **Step 2: Run frontend build**
 
 Run: `cd frontend && npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 3: Update handoff**
+- [x] **Step 3: Update handoff**
 
 Update `HANDOFF.md` with the implemented consolidation flow, verification output, and live next steps. Do not commit `HANDOFF.md`.
 
