@@ -178,17 +178,17 @@ git commit -m "feat: apply central pbs settings by selected assignment"
 **Files:**
 - Modify: `frontend/src/pages/SettingsPage.jsx`
 
-- [ ] **Step 1: Add Proxmox/PBS panels**
+- [x] **Step 1: Add Proxmox/PBS panels**
 
 Extend `SettingsPage.jsx` with compact panels for Proxmox clusters and PBS configs. The Proxmox panel must save/test/discover, show matched rows with checkboxes and agent selectors, and apply only checked rows. The PBS panel must save/test, require a selected PBS agent, and expose a checkbox plus dropdown for optional UPS assignment.
 
-- [ ] **Step 2: Run frontend build**
+- [x] **Step 2: Run frontend build**
 
 Run: `cd frontend && npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/pages/SettingsPage.jsx
