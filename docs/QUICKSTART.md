@@ -72,17 +72,30 @@ Or set manually per machine: click machine → **Config tab** → `shutdownOrder
 
 For Proxmox HA and PBS handling to run during a UPS shutdown, roles alone are not enough.
 
-- Set the same `clusterId` on every PVE node in the same cluster.
-- Set `pveConfig` on every PVE node that should enable maintenance and stop local guests before host shutdown.
-- Set `pbsConfig` on PBS machines that should abort running backup tasks before shutdown.
-- Assign each PVE/PBS machine to the UPS group that physically powers it.
-- Push config to online agents after editing, or restart agents after updating `/etc/flux-agent/config.json`.
+Use **Settings -> Proxmox VE** for PVE clusters:
+
+1. Save the cluster name, `clusterId`, API base URL, token ID, and token secret.
+2. Click **Test Token**.
+3. Click **Discover Nodes**.
+4. Review matched, ambiguous, and unmatched nodes.
+5. Select only the rows to update and choose the target Flux agent for each row.
+6. Click **Apply Selected**.
+
+Use **Settings -> Proxmox Backup Server** for PBS:
+
+1. Save the PBS URL, token ID, token secret, job abort timeout, and force-shutdown preference.
+2. Click **Test Token**.
+3. Choose the target PBS agent.
+4. Optionally check **Assign or move this PBS agent to a UPS group** and select the UPS group.
+5. Click **Apply PBS Config**.
+
+Assignment is explicit. Flux does not silently move machines between UPS groups. PBS UPS move/reset behavior runs only when the UPS assignment checkbox and group are selected.
+
+Online agents receive pushed config updates. Offline agents keep the database update and should be pushed or restarted after reconnecting.
 
 Current behavior starts shutdown orchestration on `OB LB`, not `OB` alone.
 
 The live SMS production reference is in `docs/ops/2026-06-25-live-proxmox-pbs-shutdown-config.md`.
-
-Longer-term, the cleaner design is a central **Proxmox/PBS Settings** page that stores cluster and PBS tokens once and applies node-specific config automatically. See `docs/specs/2026-06-25-central-proxmox-pbs-settings-design.md`.
 
 ---
 

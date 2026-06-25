@@ -145,17 +145,20 @@ Each machine row shows `#1 · 0s` — position and delay at a glance.
 
 Flux can coordinate Proxmox and PBS during UPS shutdowns, but this is configuration-dependent.
 
-Current model:
+Recommended model:
+- Use **Settings -> Proxmox VE** to store the shared cluster token once, test it, discover Proxmox nodes, review matched Flux agents, and apply node-specific `pveConfig` only to selected agents.
+- Use **Settings -> Proxmox Backup Server** to store the PBS token once, test it, choose the target PBS agent, and optionally assign/move it to a UPS group.
+- Token secrets are write-only in the UI. Flux shows whether a secret exists, but does not send stored secrets back to the browser.
+- Proxmox apply is selected row-by-row. Ambiguous or unmatched nodes require an operator choice.
+- PBS UPS assignment is choosable. Flux only moves the PBS machine and resets UPS-specific shutdown/order/outlet fields when the operator selects a UPS group during apply.
+
+Runtime requirements:
 - PVE nodes need a `clusterId` shared by every node in the same Proxmox cluster.
 - Every PVE node that should stop its local VMs/CTs needs `pveConfig`: PVE API URL, API token ID/secret, and the exact node name.
 - At least one online `pve-node` in each cluster needs valid `pveConfig` so Flux can set cluster HA shutdown policy to freeze before schedules are sent.
 - PBS machines need role `pbs`, a UPS assignment, and `pbsConfig`: PBS API URL, API token ID/secret, job abort timeout, and force-shutdown preference.
-- After editing config in Flux, push config to the connected agent so `/etc/flux-agent/config.json` matches the database.
-
-Recommended future model:
-- A single **Proxmox Settings** page should store cluster-level defaults once: cluster ID, API token, default API host, HA freeze timeout, and PBS endpoint/token.
-- Flux should discover nodes from the cluster API and fan out node-specific `pveConfig.node` values to matching agents automatically.
-- Per-machine PVE/PBS config should remain available only as an override for unusual nodes or multiple clusters.
+- After applying config in Settings, online agents receive a pushed config update. Offline agents keep the database update and should be pushed or restarted after reconnecting.
+- Machine-level `pveConfig` and `pbsConfig` remain available for manual overrides and unusual clusters.
 
 Live production reference for the current SMS cluster is documented in `docs/ops/2026-06-25-live-proxmox-pbs-shutdown-config.md`.
 
