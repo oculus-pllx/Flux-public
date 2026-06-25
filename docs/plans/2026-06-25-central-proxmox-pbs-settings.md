@@ -18,17 +18,17 @@
 - Create: `backend/services/proxmoxPbsSettingsService.js`
 - Create: `backend/__tests__/proxmoxPbsSettingsRoute.test.js`
 
-- [ ] **Step 1: Write failing route tests for CRUD redaction**
+- [x] **Step 1: Write failing route tests for CRUD redaction**
 
 Create `backend/__tests__/proxmoxPbsSettingsRoute.test.js` with tests that mount `/api/settings/proxmox-pbs`, create a Proxmox cluster and PBS config with secrets, assert responses include `hasTokenSecret: true`, assert `tokenSecret` is absent, and assert an update without `tokenSecret` preserves the old secret.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: FAIL because the route and models do not exist.
 
-- [ ] **Step 3: Implement minimal models, redaction helpers, and CRUD routes**
+- [x] **Step 3: Implement minimal models, redaction helpers, and CRUD routes**
 
 Add models with fields from the spec. Add service helpers:
 
@@ -54,13 +54,13 @@ PUT /api/settings/proxmox-pbs/pbs-configs/:id
 
 Mount the new route from `backend/routes/settings.js` before the base settings handlers.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/models/ProxmoxClusterConfig.js backend/models/PbsConfig.js backend/services/proxmoxPbsSettingsService.js backend/routes/settings.js backend/__tests__/proxmoxPbsSettingsRoute.test.js
