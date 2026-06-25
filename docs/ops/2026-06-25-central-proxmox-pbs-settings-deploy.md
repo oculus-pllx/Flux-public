@@ -20,6 +20,13 @@ This records the deployment target and operator flow for the central Proxmox/PBS
 - Native production: `10.11.200.135`, service `flux`, install path `/opt/flux`, app port `5174`.
 - Docker production: `192.168.0.25`, install path `/root/Flux`, frontend port `7483`.
 
+## Deployment Status - 2026-06-25
+
+- Public GitHub repo updated to include central Proxmox/PBS settings docs and implementation.
+- Private GitHub repo updated to commit `13de69d`.
+- Docker production `.25` fast-forwarded to private commit `13de69d`, rebuilt with `docker compose up -d --build`, and verified healthy.
+- Native production `.135` remained reachable over HTTP health check, but was not updated from this session because no available SSH key/user authenticated to the host and `.25` could not reach `.135` on port 22.
+
 ## Post-Deploy Verification
 
 Run after updating each production target:
