@@ -239,7 +239,7 @@ function AssignMachineToUpsButton({ device, allAgents, headers, onAssigned }) {
   )
 }
 
-function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, onRefresh, onDeviceUpdated, onEdit }) {
+function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, onRefresh, onDeviceUpdated, onEdit, dragHandleProps }) {
   const navigate = useNavigate()
   const [mutePhase,   setMutePhase]   = useState('idle')
   const [muteMsg,     setMuteMsg]     = useState('')
@@ -332,6 +332,23 @@ function UpsHeader({ device, canWrite, isAdmin, headers, machines, allAgents, on
     }}>
       {/* Name + host row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        {dragHandleProps && (
+          <span
+            {...dragHandleProps}
+            title="Drag to reorder"
+            aria-label="Drag to reorder UPS card"
+            style={{
+              color: 'var(--flux-muted)',
+              cursor: dragHandleProps['data-dragging'] ? 'grabbing' : 'grab',
+              fontSize: 16,
+              lineHeight: 1,
+              userSelect: 'none',
+              padding: '2px 0',
+              letterSpacing: 0,
+            }}>
+            ⋮⋮
+          </span>
+        )}
         <div style={{ flex: 1 }}>
           {editing ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1130,6 +1147,9 @@ export default function PowerCenter() {
   const [enrollModal,  setEnrollModal]  = useState(false)
   const [showAddUps,   setShowAddUps]   = useState(false)
   const [editUps,      setEditUps]      = useState(null)
+  const [draggingDeviceId, setDraggingDeviceId] = useState(null)
+  const [dragOverDeviceId, setDragOverDeviceId] = useState(null)
+  const [reorderError, setReorderError] = useState('')
   const headers   = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
   const canWrite  = user?.role === 'admin' || user?.role === 'operator'
   const isAdmin   = user?.role === 'admin'
@@ -1155,6 +1175,34 @@ export default function PowerCenter() {
       device.id === updatedDevice.id ? updatedDevice : device
     )))
   }, [])
+
+  const reorderDevices = useCallback(async (draggedId, targetId) => {
+    const fromId = Number(draggedId)
+    const toId = Number(targetId)
+    if (!fromId || !toId || fromId === toId) return
+
+    const fromIndex = devices.findIndex(device => device.id === fromId)
+    const toIndex = devices.findIndex(device => device.id === toId)
+    if (fromIndex === -1 || toIndex === -1) return
+
+    const reordered = [...devices]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+    setDevices(reordered)
+    setReorderError('')
+
+    try {
+      const { data } = await axios.put(
+        '/api/devices/order',
+        { deviceIds: reordered.map(device => device.id) },
+        { headers }
+      )
+      if (Array.isArray(data.devices)) setDevices(data.devices)
+    } catch (err) {
+      setReorderError(err.response?.data?.error || 'Failed to save UPS card order')
+      await load()
+    }
+  }, [devices, headers, load])
 
   useEffect(() => {
     load()
@@ -1202,6 +1250,11 @@ export default function PowerCenter() {
           <p className="font-sans text-xs mt-1" style={{ color: 'var(--flux-muted)' }}>
             {devices.length} UPS · {onlineCount} machine{onlineCount !== 1 ? 's' : ''} online
           </p>
+          {reorderError && (
+            <p className="font-sans text-xs mt-2" style={{ color: 'var(--flux-critical)' }}>
+              {reorderError}
+            </p>
+          )}
         </div>
         {canWrite && (
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -1232,12 +1285,37 @@ export default function PowerCenter() {
           const v     = device.lastStatus || {}
           const state = upsState(v['ups.status'])
           const st    = UPS_STATE_STYLE[state]
+          const isDragging = draggingDeviceId === device.id
+          const isDropTarget = dragOverDeviceId === device.id && draggingDeviceId !== device.id
 
           return (
-            <div key={device.id} style={{
+            <div
+              key={device.id}
+              onDragOver={e => {
+                if (!canWrite || !draggingDeviceId || draggingDeviceId === device.id) return
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDragOverDeviceId(device.id)
+              }}
+              onDragLeave={e => {
+                if (e.currentTarget.contains(e.relatedTarget)) return
+                setDragOverDeviceId(current => current === device.id ? null : current)
+              }}
+              onDrop={e => {
+                if (!canWrite) return
+                e.preventDefault()
+                const sourceId = e.dataTransfer.getData('text/plain') || draggingDeviceId
+                setDragOverDeviceId(null)
+                setDraggingDeviceId(null)
+                reorderDevices(sourceId, device.id)
+              }}
+              style={{
               border: `1px solid ${st.border}`,
               borderRadius: 12,
               overflow: 'hidden',
+              opacity: isDragging ? 0.55 : 1,
+              boxShadow: isDropTarget ? '0 0 0 2px var(--flux-accent)' : 'none',
+              transition: 'opacity 0.15s, box-shadow 0.15s',
             }}>
               <UpsHeader
                 device={device}
@@ -1249,6 +1327,21 @@ export default function PowerCenter() {
                 onRefresh={load}
                 onDeviceUpdated={updateDevice}
                 onEdit={() => setEditUps(device)}
+                dragHandleProps={canWrite ? {
+                  draggable: true,
+                  'data-dragging': isDragging ? 'true' : '',
+                  onClick: e => e.stopPropagation(),
+                  onDragStart: e => {
+                    setDraggingDeviceId(device.id)
+                    setDragOverDeviceId(null)
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', String(device.id))
+                  },
+                  onDragEnd: () => {
+                    setDraggingDeviceId(null)
+                    setDragOverDeviceId(null)
+                  },
+                } : null}
               />
 
               <div style={{ background: 'var(--flux-panel)' }}>
