@@ -137,17 +137,17 @@ git commit -m "feat: apply central proxmox settings to selected agents"
 - Modify: `backend/routes/settings.js`
 - Modify: `backend/__tests__/proxmoxPbsSettingsRoute.test.js`
 
-- [ ] **Step 1: Write failing tests for PBS apply**
+- [x] **Step 1: Write failing tests for PBS apply**
 
 Extend route tests to mock PBS API checks and `agentHub.sendToMachine`. Cover applying `pbsConfig` to one selected PBS agent, optional UPS assignment with reset of shutdown/order/outlet fields, no UPS move when not selected, and offline push reporting.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: FAIL because PBS test/apply endpoints are missing.
 
-- [ ] **Step 3: Implement PBS service and apply endpoints**
+- [x] **Step 3: Implement PBS service and apply endpoints**
 
 Create `backend/services/pbsService.js` with `apiRequest(pbsConfig, method, path, body)` and `testConnection(pbsConfig)` using `GET /nodes/localhost/tasks?running=1`.
 
@@ -160,13 +160,13 @@ POST /api/settings/proxmox-pbs/pbs-configs/:id/apply
 
 The apply body must include `agentMachineId`, and may include `assignUpsGroupId`. Only when `assignUpsGroupId` is present should UPS move reset fields be updated.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/services/pbsService.js backend/services/proxmoxPbsSettingsService.js backend/routes/settings.js backend/__tests__/proxmoxPbsSettingsRoute.test.js

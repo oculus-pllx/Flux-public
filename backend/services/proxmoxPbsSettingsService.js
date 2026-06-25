@@ -32,6 +32,24 @@ function buildPveConfig(cluster, node) {
   }
 }
 
+function pbsApiConfig(config) {
+  return {
+    url: config.url,
+    tokenId: config.tokenId,
+    tokenSecret: config.tokenSecret,
+  }
+}
+
+function buildPbsConfig(config) {
+  return {
+    url: config.url,
+    tokenId: config.tokenId,
+    tokenSecret: config.tokenSecret,
+    jobAbortTimeout: config.jobAbortTimeout,
+    forceShutdown: config.forceShutdown,
+  }
+}
+
 function publicAgent(machine) {
   if (!machine) return null
   return {
@@ -76,8 +94,10 @@ function buildNodeMatches(nodes, machines) {
 
 module.exports = {
   buildNodeMatches,
+  buildPbsConfig,
   buildPveConfig,
   normalizeHostname,
+  pbsApiConfig,
   pveApiConfig,
   publicAgent,
   redactConfig,

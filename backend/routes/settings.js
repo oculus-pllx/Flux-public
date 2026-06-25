@@ -6,10 +6,13 @@ const PbsConfig = require('../models/PbsConfig')
 const AgentMachine = require('../models/AgentMachine')
 const emailService = require('../services/emailService')
 const proxmoxService = require('../services/proxmoxService')
+const pbsService = require('../services/pbsService')
 const agentHub = require('../services/agentHub')
 const {
   buildNodeMatches,
+  buildPbsConfig,
   buildPveConfig,
+  pbsApiConfig,
   pveApiConfig,
   publicAgent,
   redactConfig,
@@ -150,6 +153,56 @@ router.put('/proxmox-pbs/pbs-configs/:id', async (req, res, next) => {
     if (!row) return res.status(404).json({ error: 'Not found' })
     await row.update(pickFields(req.body, PBS_FIELDS))
     res.json(redactConfig(row))
+  } catch (err) { next(err) }
+})
+
+router.post('/proxmox-pbs/pbs-configs/:id/test', async (req, res, next) => {
+  try {
+    const row = await PbsConfig.findByPk(req.params.id)
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (!row.tokenSecret) return res.status(400).json({ error: 'Token secret is required' })
+    const result = await pbsService.testConnection(pbsApiConfig(row))
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/proxmox-pbs/pbs-configs/:id/apply', async (req, res, next) => {
+  try {
+    const row = await PbsConfig.findByPk(req.params.id)
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (!row.tokenSecret) return res.status(400).json({ error: 'Token secret is required' })
+    if (!req.body.agentMachineId) return res.status(400).json({ error: 'agentMachineId is required' })
+    const machine = await AgentMachine.findByPk(req.body.agentMachineId)
+    if (!machine) return res.status(404).json({ error: 'Agent machine not found' })
+
+    const pbsConfig = buildPbsConfig(row)
+    const updates = { pbsConfig }
+    const assignUpsGroupId = Object.prototype.hasOwnProperty.call(req.body, 'assignUpsGroupId')
+      ? req.body.assignUpsGroupId
+      : null
+    if (assignUpsGroupId !== null && assignUpsGroupId !== '') {
+      updates.upsGroupId = assignUpsGroupId
+      updates.shutdownOrder = 0
+      updates.shutdownDelay = 0
+      updates.shutdownTimeout = 120
+      updates.upsOutlet = null
+      updates.upsOutletBatteryBacked = null
+    }
+    await machine.update(updates)
+
+    const payload = { type: 'config-update', pbsConfig }
+    if (assignUpsGroupId !== null && assignUpsGroupId !== '') payload.upsGroupId = assignUpsGroupId
+    const pushed = agentHub.sendToMachine(machine.machineKey, payload)
+
+    res.json({
+      agentMachineId: machine.id,
+      hostname: machine.hostname,
+      pushed,
+      pushStatus: pushed ? 'sent' : 'offline',
+      assignedUpsGroupId: assignUpsGroupId !== null && assignUpsGroupId !== '' ? assignUpsGroupId : null,
+    })
   } catch (err) { next(err) }
 })
 

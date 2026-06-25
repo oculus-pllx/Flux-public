@@ -13,10 +13,16 @@ jest.mock('../services/agentHub', () => ({
   sendToMachine: jest.fn(),
 }))
 
+jest.mock('../services/pbsService', () => ({
+  testConnection: jest.fn(),
+}), { virtual: true })
+
 const { sequelize } = require('../config/database')
 const AgentMachine = require('../models/AgentMachine')
+const Device = require('../models/Device')
 const proxmoxService = require('../services/proxmoxService')
 const agentHub = require('../services/agentHub')
+const pbsService = require('../services/pbsService')
 
 const app = express()
 app.use(express.json())
@@ -33,6 +39,7 @@ beforeEach(async () => {
   await sequelize.truncate({ cascade: true })
   proxmoxService.listNodes.mockReset()
   agentHub.sendToMachine.mockReset()
+  pbsService.testConnection.mockReset()
 })
 
 afterAll(async () => {
@@ -289,5 +296,139 @@ describe('central Proxmox discovery and selected apply', () => {
         node: 'sms-pve-3',
       },
     })
+  })
+})
+
+describe('central PBS test and selected assignment', () => {
+  async function createPbsConfig(overrides = {}) {
+    const res = await request(app)
+      .post('/api/settings/proxmox-pbs/pbs-configs')
+      .set(auth)
+      .send({
+        name: 'SMS PBS',
+        url: 'https://sms-pbs:8007',
+        tokenId: 'flux@pbs!flux-ups',
+        tokenSecret: 'pbs-secret',
+        jobAbortTimeout: 180,
+        forceShutdown: true,
+        enabled: true,
+        ...overrides,
+      })
+    expect(res.status).toBe(201)
+    return res.body
+  }
+
+  it('tests a PBS config without exposing the token secret', async () => {
+    const config = await createPbsConfig()
+    pbsService.testConnection.mockResolvedValue({ runningJobCount: 2 })
+
+    const res = await request(app)
+      .post(`/api/settings/proxmox-pbs/pbs-configs/${config.id}/test`)
+      .set(auth)
+      .send()
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, runningJobCount: 2 })
+    expect(pbsService.testConnection).toHaveBeenCalledWith({
+      url: 'https://sms-pbs:8007',
+      tokenId: 'flux@pbs!flux-ups',
+      tokenSecret: 'pbs-secret',
+    })
+  })
+
+  it('applies PBS config without moving UPS assignment when no UPS group is selected', async () => {
+    const config = await createPbsConfig()
+    const pbs = await AgentMachine.create({
+      machineKey: 'pbs-key',
+      hostname: 'sms-pbs',
+      role: 'pbs',
+      upsGroupId: 8,
+      shutdownOrder: 2,
+      shutdownDelay: 30,
+      shutdownTimeout: 240,
+      upsOutlet: 'Bank A',
+      upsOutletBatteryBacked: false,
+    })
+    agentHub.sendToMachine.mockReturnValueOnce(false)
+
+    const res = await request(app)
+      .post(`/api/settings/proxmox-pbs/pbs-configs/${config.id}/apply`)
+      .set(auth)
+      .send({ agentMachineId: pbs.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(expect.objectContaining({
+      agentMachineId: pbs.id,
+      pushed: false,
+      pushStatus: 'offline',
+      assignedUpsGroupId: null,
+    }))
+
+    await pbs.reload()
+    expect(pbs.pbsConfig).toEqual({
+      url: 'https://sms-pbs:8007',
+      tokenId: 'flux@pbs!flux-ups',
+      tokenSecret: 'pbs-secret',
+      jobAbortTimeout: 180,
+      forceShutdown: true,
+    })
+    expect(pbs.upsGroupId).toBe(8)
+    expect(pbs.shutdownOrder).toBe(2)
+    expect(pbs.shutdownDelay).toBe(30)
+    expect(pbs.shutdownTimeout).toBe(240)
+    expect(pbs.upsOutlet).toBe('Bank A')
+    expect(pbs.upsOutletBatteryBacked).toBe(false)
+  })
+
+  it('applies PBS config and resets UPS-specific fields only when UPS assignment is selected', async () => {
+    const config = await createPbsConfig({ forceShutdown: false })
+    const ups = await Device.create({ name: 'PVE-6-1500', host: '10.11.200.26', upsName: 'apc' })
+    const pbs = await AgentMachine.create({
+      machineKey: 'online-pbs-key',
+      hostname: 'sms-pbs',
+      role: 'pbs',
+      upsGroupId: null,
+      shutdownOrder: 4,
+      shutdownDelay: 90,
+      shutdownTimeout: 300,
+      upsOutlet: 'Old Bank',
+      upsOutletBatteryBacked: true,
+    })
+    agentHub.sendToMachine.mockReturnValueOnce(true)
+
+    const res = await request(app)
+      .post(`/api/settings/proxmox-pbs/pbs-configs/${config.id}/apply`)
+      .set(auth)
+      .send({
+        agentMachineId: pbs.id,
+        assignUpsGroupId: ups.id,
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(expect.objectContaining({
+      agentMachineId: pbs.id,
+      pushed: true,
+      pushStatus: 'sent',
+      assignedUpsGroupId: ups.id,
+    }))
+    expect(agentHub.sendToMachine).toHaveBeenCalledWith('online-pbs-key', {
+      type: 'config-update',
+      pbsConfig: {
+        url: 'https://sms-pbs:8007',
+        tokenId: 'flux@pbs!flux-ups',
+        tokenSecret: 'pbs-secret',
+        jobAbortTimeout: 180,
+        forceShutdown: false,
+      },
+      upsGroupId: ups.id,
+    })
+
+    await pbs.reload()
+    expect(pbs.upsGroupId).toBe(ups.id)
+    expect(pbs.shutdownOrder).toBe(0)
+    expect(pbs.shutdownDelay).toBe(0)
+    expect(pbs.shutdownTimeout).toBe(120)
+    expect(pbs.upsOutlet).toBeNull()
+    expect(pbs.upsOutletBatteryBacked).toBeNull()
   })
 })
