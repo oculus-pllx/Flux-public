@@ -364,3 +364,65 @@ describe('POST /api/devices/:id/reprobe', () => {
     expect(agentHub.requestMachine).not.toHaveBeenCalled()
   })
 })
+
+describe('UPS card ordering', () => {
+  beforeEach(async () => {
+    await Device.destroy({ where: {} })
+  })
+
+  it('lists devices by displayOrder, then name, then id', async () => {
+    await Device.create({ name: 'Rack C', host: '10.0.0.3', upsName: 'c', displayOrder: 20 })
+    await Device.create({ name: 'Rack A', host: '10.0.0.1', upsName: 'a', displayOrder: 10 })
+    await Device.create({ name: 'Rack B', host: '10.0.0.2', upsName: 'b', displayOrder: 10 })
+
+    const res = await request(app).get('/api/devices').set(auth)
+
+    expect(res.status).toBe(200)
+    expect(res.body.map(d => d.name)).toEqual(['Rack A', 'Rack B', 'Rack C'])
+  })
+
+  it('persists a submitted UPS card order', async () => {
+    const first = await Device.create({ name: 'First', host: '10.0.0.11', upsName: 'first' })
+    const second = await Device.create({ name: 'Second', host: '10.0.0.12', upsName: 'second' })
+    const third = await Device.create({ name: 'Third', host: '10.0.0.13', upsName: 'third' })
+
+    const res = await request(app)
+      .put('/api/devices/order')
+      .set(auth)
+      .send({ deviceIds: [third.id, first.id, second.id] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.devices.map(d => d.id)).toEqual([third.id, first.id, second.id])
+
+    await first.reload()
+    await second.reload()
+    await third.reload()
+    expect(third.displayOrder).toBe(1)
+    expect(first.displayOrder).toBe(2)
+    expect(second.displayOrder).toBe(3)
+  })
+
+  it('rejects unknown IDs when ordering UPS cards', async () => {
+    const device = await Device.create({ name: 'Only', host: '10.0.0.21', upsName: 'only' })
+
+    const res = await request(app)
+      .put('/api/devices/order')
+      .set(auth)
+      .send({ deviceIds: [device.id, 99999] })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toMatch(/not found/i)
+  })
+
+  it('rejects viewers when ordering UPS cards', async () => {
+    const device = await Device.create({ name: 'Only', host: '10.0.0.31', upsName: 'only' })
+
+    const res = await request(app)
+      .put('/api/devices/order')
+      .set({ Authorization: `Bearer ${viewerToken}` })
+      .send({ deviceIds: [device.id] })
+
+    expect(res.status).toBe(403)
+  })
+})

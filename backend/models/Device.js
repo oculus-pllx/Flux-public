@@ -8,6 +8,7 @@ const Device = sequelize.define('Device', {
   port: { type: DataTypes.INTEGER, defaultValue: 3493 },
   upsName: { type: DataTypes.STRING, defaultValue: 'ups' },
   groupId: { type: DataTypes.INTEGER, allowNull: true },
+  displayOrder: { type: DataTypes.INTEGER, defaultValue: 0 },
   pollInterval: { type: DataTypes.INTEGER, defaultValue: 30 },
   nutUsername: { type: DataTypes.STRING, allowNull: true },
   nutPassword: { type: DataTypes.STRING, allowNull: true },

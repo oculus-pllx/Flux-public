@@ -15,6 +15,8 @@ const {
 
 router.use(authenticate)
 
+const DEVICE_ORDER = [['displayOrder', 'ASC'], ['name', 'ASC'], ['id', 'ASC']]
+
 function sanitizeDevice(device) {
   const obj = device.toJSON()
   delete obj.nutPassword
@@ -45,8 +47,37 @@ function devicePayload(body, { preserveBlankPassword = false } = {}) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const devices = await Device.findAll()
+    const devices = await Device.findAll({ order: DEVICE_ORDER })
     res.json(devices.map(sanitizeDevice))
+  } catch (err) { next(err) }
+})
+
+router.put('/order', requireRole('admin', 'operator'), async (req, res, next) => {
+  try {
+    const ids = req.body.deviceIds
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'deviceIds must be a non-empty array' })
+    }
+
+    const deviceIds = ids.map(id => Number(id))
+    if (deviceIds.some(id => !Number.isInteger(id) || id <= 0)) {
+      return res.status(400).json({ error: 'deviceIds must contain only positive integer IDs' })
+    }
+    if (new Set(deviceIds).size !== deviceIds.length) {
+      return res.status(400).json({ error: 'deviceIds must not contain duplicates' })
+    }
+
+    const devices = await Device.findAll({ where: { id: deviceIds } })
+    if (devices.length !== deviceIds.length) {
+      return res.status(404).json({ error: 'One or more devices were not found' })
+    }
+
+    await Promise.all(deviceIds.map((id, index) =>
+      Device.update({ displayOrder: index + 1 }, { where: { id } })
+    ))
+
+    const ordered = await Device.findAll({ order: DEVICE_ORDER })
+    res.json({ ok: true, devices: ordered.map(sanitizeDevice) })
   } catch (err) { next(err) }
 })
 
