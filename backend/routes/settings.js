@@ -3,8 +3,18 @@ const { authenticate, requireRole } = require('../middleware/auth')
 const Setting = require('../models/Setting')
 const ProxmoxClusterConfig = require('../models/ProxmoxClusterConfig')
 const PbsConfig = require('../models/PbsConfig')
+const AgentMachine = require('../models/AgentMachine')
 const emailService = require('../services/emailService')
-const { redactConfig, stripBlankSecret } = require('../services/proxmoxPbsSettingsService')
+const proxmoxService = require('../services/proxmoxService')
+const agentHub = require('../services/agentHub')
+const {
+  buildNodeMatches,
+  buildPveConfig,
+  pveApiConfig,
+  publicAgent,
+  redactConfig,
+  stripBlankSecret,
+} = require('../services/proxmoxPbsSettingsService')
 
 router.use(authenticate, requireRole('admin'))
 
@@ -42,6 +52,81 @@ router.put('/proxmox-pbs/proxmox-clusters/:id', async (req, res, next) => {
     if (!row) return res.status(404).json({ error: 'Not found' })
     await row.update(pickFields(req.body, PROXMOX_FIELDS))
     res.json(redactConfig(row))
+  } catch (err) { next(err) }
+})
+
+router.post('/proxmox-pbs/proxmox-clusters/:id/test', async (req, res, next) => {
+  try {
+    const row = await ProxmoxClusterConfig.findByPk(req.params.id)
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (!row.tokenSecret) return res.status(400).json({ error: 'Token secret is required' })
+    const nodes = await proxmoxService.listNodes(pveApiConfig(row))
+    res.json({ ok: true, nodeCount: Array.isArray(nodes) ? nodes.length : 0 })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/proxmox-pbs/proxmox-clusters/:id/discover', async (req, res, next) => {
+  try {
+    const row = await ProxmoxClusterConfig.findByPk(req.params.id)
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (!row.tokenSecret) return res.status(400).json({ error: 'Token secret is required' })
+    const [nodes, machines] = await Promise.all([
+      proxmoxService.listNodes(pveApiConfig(row)),
+      AgentMachine.findAll({ order: [['hostname', 'ASC']] }),
+    ])
+    const matches = buildNodeMatches(nodes, machines)
+    const matchedIds = new Set(matches.flatMap((m) => m.candidates.map((c) => c.id)))
+    const unmatchedAgents = machines
+      .filter((m) => ['pve-node', 'ups-host', 'both'].includes(m.role))
+      .filter((m) => !matchedIds.has(m.id))
+      .map(publicAgent)
+    res.json({ nodes: matches, unmatchedAgents })
+  } catch (err) { next(err) }
+})
+
+router.post('/proxmox-pbs/proxmox-clusters/:id/apply', async (req, res, next) => {
+  try {
+    const row = await ProxmoxClusterConfig.findByPk(req.params.id)
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (!row.tokenSecret) return res.status(400).json({ error: 'Token secret is required' })
+    const targets = Array.isArray(req.body.targets) ? req.body.targets : []
+    if (targets.length === 0) return res.status(400).json({ error: 'targets are required' })
+
+    const applied = []
+    for (const target of targets) {
+      const machine = await AgentMachine.findByPk(target.agentMachineId)
+      if (!machine) {
+        applied.push({
+          node: target.node,
+          agentMachineId: target.agentMachineId,
+          pushed: false,
+          pushStatus: 'not-found',
+        })
+        continue
+      }
+
+      const pveConfig = buildPveConfig(row, target.node)
+      await machine.update({
+        clusterId: row.clusterId,
+        pveConfig,
+      })
+      const pushed = agentHub.sendToMachine(machine.machineKey, {
+        type: 'config-update',
+        clusterId: row.clusterId,
+        pveConfig,
+      })
+      applied.push({
+        node: target.node,
+        agentMachineId: machine.id,
+        hostname: machine.hostname,
+        pushed,
+        pushStatus: pushed ? 'sent' : 'offline',
+      })
+    }
+
+    res.json({ applied })
   } catch (err) { next(err) }
 })
 

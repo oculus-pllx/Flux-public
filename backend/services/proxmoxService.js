@@ -68,6 +68,10 @@ async function getClusterOptions(pveConfig) {
   return apiRequest(pveConfig, 'GET', '/cluster/options')
 }
 
+async function listNodes(pveConfig) {
+  return apiRequest(pveConfig, 'GET', '/nodes')
+}
+
 /**
  * Poll until HA shutdown_policy is set to 'freeze', or timeout.
  * timeoutMs defaults to 30000 (matches ClusterGroup.haFreezeTimeout default).
@@ -83,4 +87,4 @@ async function waitHaFrozen(pveConfig, timeoutMs = 30000) {
   throw new Error(`HA freeze confirmation timed out after ${timeoutMs}ms`)
 }
 
-module.exports = { apiRequest, freezeHa, restoreHaPolicy, getClusterOptions, waitHaFrozen }
+module.exports = { apiRequest, freezeHa, restoreHaPolicy, getClusterOptions, listNodes, waitHaFrozen }

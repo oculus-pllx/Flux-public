@@ -75,17 +75,17 @@ git commit -m "feat: add central proxmox pbs settings storage"
 - Modify: `backend/routes/settings.js`
 - Modify: `backend/__tests__/proxmoxPbsSettingsRoute.test.js`
 
-- [ ] **Step 1: Write failing tests for discovery and selected apply**
+- [x] **Step 1: Write failing tests for discovery and selected apply**
 
 Extend `proxmoxPbsSettingsRoute.test.js` to mock `proxmoxService.listNodes` and `agentHub.sendToMachine`. Tests must cover normalized hostname matching, ambiguous duplicate matches requiring selection, applying only selected rows, preserving unrelated machine fields, and offline push reporting.
 
-- [ ] **Step 2: Run test to verify RED**
+- [x] **Step 2: Run test to verify RED**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: FAIL because discovery/apply endpoints and `listNodes` are missing.
 
-- [ ] **Step 3: Implement Proxmox support**
+- [x] **Step 3: Implement Proxmox support**
 
 Add `listNodes(pveConfig)` to `backend/services/proxmoxService.js` using `apiRequest(pveConfig, 'GET', '/nodes')`.
 
@@ -116,13 +116,13 @@ POST /api/settings/proxmox-pbs/proxmox-clusters/:id/apply
 
 The apply request body must include `targets: [{ node, agentMachineId }]`. Only those selected rows are changed.
 
-- [ ] **Step 4: Run test to verify GREEN**
+- [x] **Step 4: Run test to verify GREEN**
 
 Run: `cd backend && npm test -- proxmoxPbsSettingsRoute.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/services/proxmoxService.js backend/services/proxmoxPbsSettingsService.js backend/routes/settings.js backend/__tests__/proxmoxPbsSettingsRoute.test.js
